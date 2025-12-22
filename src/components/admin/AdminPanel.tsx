@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { LotterySettings, TicketRequest, Ticket, User } from '../../types';
@@ -16,6 +16,9 @@ export function AdminPanel() {
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [requestSearch, setRequestSearch] = useState('');
+  const [requestStatus, setRequestStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [requestUser, setRequestUser] = useState<'all' | string>('all');
   const [formData, setFormData] = useState({
     eventDate: '',
     ticketPrice: 50,
@@ -70,8 +73,7 @@ export function AdminPanel() {
 
     const requestsQuery = query(
       collection(db, 'ticketRequests'),
-      where('lotteryId', '==', lottery.id),
-      where('status', '==', 'pending')
+      where('lotteryId', '==', lottery.id)
     );
 
     const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
@@ -133,8 +135,33 @@ export function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    setStats(prev => ({ ...prev, pendingRequests: ticketRequests.length }));
+    const pendingCount = ticketRequests.filter(r => r.status === 'pending').length;
+    setStats(prev => ({ ...prev, pendingRequests: pendingCount }));
   }, [ticketRequests]);
+
+  const statusCounts = {
+    all: ticketRequests.length,
+    pending: ticketRequests.filter(r => r.status === 'pending').length,
+    approved: ticketRequests.filter(r => r.status === 'approved').length,
+    rejected: ticketRequests.filter(r => r.status === 'rejected').length
+  };
+
+  const uniqueRequestUsers = Array.from(
+    new Map(ticketRequests.map(r => [r.userId, r.userName || r.userEmail || ''])).entries()
+  ).map(([uid, name]) => ({ uid, name: name || 'İsimsiz' }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
+  const filteredRequests = ticketRequests
+    .filter(req => requestStatus === 'all' ? true : req.status === requestStatus)
+    .filter(req => requestUser === 'all' ? true : req.userId === requestUser)
+    .filter(req => {
+      if (!requestSearch.trim()) return true;
+      const term = requestSearch.toLowerCase();
+      return (req.userName && req.userName.toLowerCase().includes(term)) ||
+        (req.userEmail && req.userEmail.toLowerCase().includes(term)) ||
+        req.ticketNumber.toString().padStart(3, '0').includes(term) ||
+        req.ticketId.toLowerCase().includes(term);
+    });
 
   const generateTickets = async (lotteryId: string, maxTickets: number) => {
     const tickets: any[] = [];
@@ -371,8 +398,8 @@ export function AdminPanel() {
           onClick={() => setActiveTab('requests')}
         >
           📝 İstekler
-          {ticketRequests.length > 0 && (
-            <span className="tab-badge">{ticketRequests.length}</span>
+          {statusCounts.pending > 0 && (
+            <span className="tab-badge">{statusCounts.pending}</span>
           )}
         </button>
         <button
@@ -459,14 +486,71 @@ export function AdminPanel() {
         {activeTab === 'requests' && (
           <div className="requests-tab">
             <h2>Bilet İstekleri</h2>
-            {ticketRequests.length === 0 ? (
+            <div className="requests-toolbar">
+              <div className="search-input">
+                <input
+                  type="text"
+                  placeholder="İsim, e-posta, bilet no veya istek ID ile ara"
+                  value={requestSearch}
+                  onChange={(e) => setRequestSearch(e.target.value)}
+                />
+              </div>
+              <div className="request-filters">
+                <div className="status-filters">
+                  <button
+                    className={`status-filter ${requestStatus === 'pending' ? 'active' : ''}`}
+                    onClick={() => setRequestStatus('pending')}
+                  >
+                    Bekleyen ({statusCounts.pending})
+                  </button>
+                  <button
+                    className={`status-filter ${requestStatus === 'approved' ? 'active' : ''}`}
+                    onClick={() => setRequestStatus('approved')}
+                  >
+                    Onaylanan ({statusCounts.approved})
+                  </button>
+                  <button
+                    className={`status-filter ${requestStatus === 'rejected' ? 'active' : ''}`}
+                    onClick={() => setRequestStatus('rejected')}
+                  >
+                    Reddedilen ({statusCounts.rejected})
+                  </button>
+                  <button
+                    className={`status-filter ${requestStatus === 'all' ? 'active' : ''}`}
+                    onClick={() => setRequestStatus('all')}
+                  >
+                    Tümü ({statusCounts.all})
+                  </button>
+                </div>
+                <div className="user-filter">
+                  <label>Kullanıcı:</label>
+                  <select
+                    value={requestUser}
+                    onChange={(e) => setRequestUser(e.target.value as 'all' | string)}
+                  >
+                    <option value="all">Tüm kullanıcılar</option>
+                    {uniqueRequestUsers.map(u => (
+                      <option key={u.uid} value={u.uid}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {filteredRequests.length === 0 ? (
               <div className="no-data">
-                <div className="empty-icon">📭</div>
-                <p>Bekleyen istek yok</p>
+                <div className="empty-icon">{ticketRequests.length === 0 ? '📭' : '🔍'}</div>
+                <p>
+                  {ticketRequests.length === 0
+                    ? 'Bekleyen istek yok'
+                    : 'Bu filtrelere uyan istek bulunamadı'}
+                </p>
               </div>
             ) : (
               <div className="requests-list">
-                {ticketRequests.map(request => (
+                {filteredRequests.map(request => (
                   <div key={request.id} className="request-card">
                     <div className="request-header">
                       <div className="user-info">
@@ -476,8 +560,15 @@ export function AdminPanel() {
                           <div className="user-email">{request.userEmail}</div>
                         </div>
                       </div>
-                      <div className="ticket-badge">
-                        🎫 #{request.ticketNumber.toString().padStart(3, '0')}
+                      <div className="request-badges">
+                        <div className="ticket-badge">
+                          🎫 #{request.ticketNumber.toString().padStart(3, '0')}
+                        </div>
+                        <span className={`status-chip ${request.status}`}>
+                          {request.status === 'pending' && 'Beklemede'}
+                          {request.status === 'approved' && 'Onaylandı'}
+                          {request.status === 'rejected' && 'Reddedildi'}
+                        </span>
                       </div>
                     </div>
                     <div className="request-meta">
@@ -488,20 +579,28 @@ export function AdminPanel() {
                         💰 {lottery.ticketPrice} TL
                       </span>
                     </div>
-                    <div className="request-actions">
-                      <button
-                        onClick={() => handleApproveRequest(request)}
-                        className="approve-button"
-                      >
-                        ✓ Onayla
-                      </button>
-                      <button
-                        onClick={() => handleRejectRequest(request)}
-                        className="reject-button"
-                      >
-                        ✕ Reddet
-                      </button>
-                    </div>
+                    {request.status === 'pending' ? (
+                      <div className="request-actions">
+                        <button
+                          onClick={() => handleApproveRequest(request)}
+                          className="approve-button"
+                        >
+                          ✓ Onayla
+                        </button>
+                        <button
+                          onClick={() => handleRejectRequest(request)}
+                          className="reject-button"
+                        >
+                          ✕ Reddet
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="request-actions inactive">
+                        <div className="decision-note">
+                          {request.status === 'approved' ? '✅ Bu istek onaylandı' : '🚫 Bu istek reddedildi'}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -289,6 +289,92 @@
   gap: 16px;
 }
 
+.requests-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search-input input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.search-input input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+}
+
+.request-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-filter {
+  padding: 8px 14px;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  color: #555;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+}
+
+.status-filter:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.status-filter.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(102, 126, 234, 0.3);
+}
+
+.user-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid #e9ecef;
+}
+
+.user-filter label {
+  font-weight: 600;
+  color: #555;
+  font-size: 13px;
+}
+
+.user-filter select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+}
+
 .request-card {
   border: 2px solid #e9ecef;
   border-radius: 12px;
@@ -341,6 +427,39 @@
   font-size: 14px;
 }
 
+.request-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status-chip {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.status-chip.pending {
+  background: #fff3e0;
+  color: #e17055;
+  border: 1px solid #ffc78f;
+}
+
+.status-chip.approved {
+  background: #e8f5e9;
+  color: #00b894;
+  border: 1px solid #55efc4;
+}
+
+.status-chip.rejected {
+  background: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+}
+
 .request-meta {
   display: flex;
   gap: 24px;
@@ -357,6 +476,19 @@
 .request-actions {
   display: flex;
   gap: 12px;
+}
+
+.request-actions.inactive {
+  justify-content: flex-end;
+}
+
+.decision-note {
+  padding: 10px 14px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #555;
 }
 
 .approve-button,
@@ -813,5 +945,23 @@
 
   .tickets-filter {
     flex-direction: column;
+  }
+
+  .request-filters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status-filters {
+    width: 100%;
+  }
+
+  .user-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .user-filter select {
+    flex: 1;
   }
 }
