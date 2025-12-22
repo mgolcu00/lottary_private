@@ -274,42 +274,99 @@ Bu uygulama **Single Page Application (SPA)** olarak çalışır. Statik hosting
 direkt URL'lere (örn: `/admin`, `/lottery`) erişim sağlamak için yönlendirme (rewrite) kuralları gereklidir.
 
 **Dahil Edilen Dosyalar:**
-- `render.yaml` - Render.com için otomatik konfigürasyon
-- `public/_redirects` - Netlify/Render static site için yönlendirme kuralları
+- `vercel.json` - Vercel için rewrite kuralları ✅ (otomatik çalışır)
+- `public/_redirects` - Netlify için yönlendirme kuralları ✅ (otomatik çalışır)
+- `render.yaml` - Render için konfigürasyon (Static Sites'te otomatik çalışmaz)
 
-Tüm route'lar otomatik olarak `/index.html`'e yönlendirilir ve React Router client-side routing yapar.
+**📝 Routing Nasıl Çalışır:**
+Tüm route'lar (`/admin`, `/lottery`, vb.) `/index.html`'e yönlendirilir → React Router client-side'da doğru sayfayı gösterir.
 
-### Vercel
+### Vercel ✅ (En Kolay)
 
 1. Vercel hesabınıza giriş yapın
 2. Projeyi import edin
-3. Environment variables ekleyin
-4. Deploy!
-
-### Render (Static Site)
-
-**Otomatik Deploy (Önerilen):**
-1. GitHub repo'nuzu Render'a bağlayın
-2. `render.yaml` dosyası otomatik algılanacak
 3. Environment variables ekleyin (Firebase config)
 4. Deploy!
 
-**Manuel Ayarlar:**
+**Not**: `vercel.json` dosyası proje içinde mevcut, routing otomatik çalışır! 🎉
+
+### Render (Static Site)
+
+**🚨 ÖNEMLİ: SPA Routing İçin Zorunlu Ayarlar**
+
+Render Dashboard'da projenizi oluşturduktan sonra:
+
+1. **Settings** → **Redirects/Rewrites** bölümüne gidin
+2. **Add Rewrite Rule** butonuna tıklayın
+3. Aşağıdaki kuralı ekleyin:
+   - **Source**: `/*`
+   - **Destination**: `/index.html`
+   - **Action**: `Rewrite`
+
+**Temel Ayarlar:**
 1. **Type**: Static Site
 2. **Build Command**: `npm install && npm run build`
 3. **Publish Directory**: `dist`
-4. Environment variables ekleyin
+4. **Auto-Deploy**: Yes
+5. Environment variables:
+   ```
+   VITE_FIREBASE_API_KEY=your_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_domain
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_bucket
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   ```
 
-**ÖNEMLİ**: Proje `render.yaml` ve `public/_redirects` dosyalarını içerir.
-Bu dosyalar SPA routing için gereklidir (tüm route'lar `/index.html`'e yönlendirilir).
+**Not**: `render.yaml` ve `public/_redirects` dosyaları dahil edilmiştir ancak
+Render Static Sites bunları otomatik okumaz. Manuel olarak Rewrite Rule eklemeniz gerekir.
 
-### Netlify
+### Netlify ✅ (Kolay)
 
 1. Netlify'a GitHub repo'nuzu bağlayın
 2. **Build Command**: `npm run build`
 3. **Publish Directory**: `dist`
-4. Environment variables ekleyin
-5. `public/_redirects` dosyası otomatik algılanır ✅
+4. Environment variables ekleyin (Firebase config)
+
+**Not**: `public/_redirects` dosyası otomatik algılanır, routing çalışır! 🎉
+
+## 🔧 Deployment Sorun Giderme
+
+### Problem: Sayfayı yenilediğimde 404 hatası alıyorum
+
+**Çözüm (Render için):**
+1. Render Dashboard → Your Service → **Settings**
+2. **Redirects/Rewrites** sekmesine git
+3. **Add Rule** butonuna tıkla
+4. Şu ayarları gir:
+   - Source: `/*`
+   - Destination: `/index.html`
+   - Action: **Rewrite** (redirect değil!)
+5. Save değişiklikleri
+
+**Çözüm (Vercel/Netlify için):**
+Bu platformlarda `vercel.json` ve `_redirects` otomatik çalışır. Sorun yaşıyorsanız:
+- Build loglarını kontrol edin
+- `dist/_redirects` dosyasının build'de oluştuğunu doğrulayın
+
+### Problem: Bilet görselleri (ticket images) 404 hatası veriyor
+
+**Çözüm:**
+Projeyi yeniden build edin:
+```bash
+npm run build
+```
+
+`dist/` klasöründe `ticket_2_5.png` dosyasının olduğunu kontrol edin.
+Eğer yoksa, `public/ticket_2_5.png` dosyasının var olduğundan emin olun.
+
+### Problem: Firebase bağlantısı çalışmıyor
+
+**Çözüm:**
+Environment variables'ın doğru ayarlandığından emin olun:
+- Tüm `VITE_` prefix'li değişkenler mevcut olmalı
+- Değerlerde tırnak işareti **olmamalı**
+- Deploy sonrası servis yeniden başlatılmalı
 
 ## 🤝 Katkıda Bulunma
 

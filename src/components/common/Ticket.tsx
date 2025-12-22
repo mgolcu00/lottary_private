@@ -38,9 +38,9 @@ export function Ticket({ ticket, highlightedNumbers = [], highlightedIndices = [
 
   return (
     <div className={`ticket-container ${onClick ? 'clickable' : ''} ${isAmortiWinner ? 'amorti-winner-ticket' : ''} ${isGrandWinner ? 'grand-winner-ticket' : ''}`} onClick={onClick}>
-      {/* Background image will be ticket_1_5.png */}
+      {/* Background image will be ticket_2_5.png */}
       <div className="ticket-background">
-        <img src="/src/assets/ticket_2_5.png" alt="Lottery Ticket" />
+        <img src="/ticket_2_5.png" alt="Lottery Ticket" />
       </div>
 
       {/* Serial Number (Bilet No) */}
