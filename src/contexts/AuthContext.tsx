@@ -34,11 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         const userData = userDoc.data();
 
+        // Check if user is default admin from environment variable
+        const defaultAdminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        const isDefaultAdmin = defaultAdminEmail && firebaseUser.email === defaultAdminEmail;
+
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email!,
           displayName: userData?.displayName || firebaseUser.displayName || '',
-          isAdmin: userData?.isAdmin || false,
+          isAdmin: isDefaultAdmin || userData?.isAdmin || false,
           termsAccepted: userData?.termsAccepted || false,
           termsAcceptedAt: userData?.termsAcceptedAt,
           isOver18: userData?.isOver18 || false

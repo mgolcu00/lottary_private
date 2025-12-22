@@ -52,7 +52,19 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || !user.isAdmin) {
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!user.displayName) {
+    return <Navigate to="/setup-name" />;
+  }
+
+  if (!user.termsAccepted) {
+    return <Navigate to="/disclaimer" />;
+  }
+
+  if (!user.isAdmin) {
     return <Navigate to="/" />;
   }
 
