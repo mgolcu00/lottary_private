@@ -17,6 +17,7 @@ export function AdminPanel() {
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [numberRange, setNumberRange] = useState<'1-9' | '1-99'>('1-9');
   const [requestSearch, setRequestSearch] = useState('');
   const [requestStatus, setRequestStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [requestUser, setRequestUser] = useState<'all' | string>('all');
@@ -37,6 +38,7 @@ export function AdminPanel() {
     pendingRequests: 0,
     totalRevenue: 0
   });
+  const maxTicketsCap = numberRange === '1-9' ? 59049 : 100000;
 
   // Tüm çekilişleri dinle
   useEffect(() => {
@@ -52,6 +54,7 @@ export function AdminPanel() {
           createdAt: toDateSafe(data.createdAt),
           updatedAt: toDateSafe(data.updatedAt),
           salesOpen: data.salesOpen ?? true,
+          numberRange: data.numberRange ?? '1-9',
           status: data.status ?? (data.isActive ? 'active' : 'scheduled')
         } as LotterySettings;
       }).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -65,6 +68,7 @@ export function AdminPanel() {
         const next = activeLottery || lotteries[0];
         setLottery(next);
         setRulesDraft(next.rules || '');
+        setNumberRange(next.numberRange ?? '1-9');
       } else if (lotteries.length === 0) {
         setLottery(null);
         setShowCreateForm(true);
@@ -77,6 +81,7 @@ export function AdminPanel() {
   useEffect(() => {
     if (!lottery) return;
     setRulesDraft(lottery.rules || '');
+    setNumberRange(lottery.numberRange ?? '1-9');
 
     const requestsQuery = query(
       collection(db, 'ticketRequests'),
@@ -170,17 +175,17 @@ export function AdminPanel() {
         req.ticketId.toLowerCase().includes(term);
     });
 
-  const generateTickets = async (lotteryId: string, maxTickets: number) => {
+  const generateTickets = async (lotteryId: string, maxTickets: number, rangeMax: number) => {
     const tickets: any[] = [];
     const generatedCombinations = new Set<string>();
 
     for (let i = 1; i <= maxTickets; i++) {
-      // Generate unique 5-digit number combination (digits 1-9)
+      // Generate unique 5-number combination within selected range
       let numbers: number[];
       let combination: string;
 
       do {
-        numbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * 9) + 1);
+        numbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * rangeMax) + 1);
         combination = numbers.join('');
       } while (generatedCombinations.has(combination));
 
@@ -190,7 +195,8 @@ export function AdminPanel() {
         ticketNumber: i,
         lotteryId,
         status: 'available',
-        numbers
+        numbers,
+        price: formData.ticketPrice
       });
     }
 
@@ -206,18 +212,25 @@ export function AdminPanel() {
     e.preventDefault();
 
     try {
+      const rangeMax = numberRange === '1-9' ? 9 : 99;
+      const maxCap = numberRange === '1-9' ? 59049 : 100000;
+      const desiredTicketCount = Math.min(formData.maxTickets, maxCap);
+
       const lotteryRef = await addDoc(collection(db, 'lotteries'), {
         lotteryName: formData.lotteryName || `Çekiliş ${new Date().toLocaleDateString('tr-TR')}`,
         eventDate: new Date(formData.eventDate),
         ticketPrice: formData.ticketPrice,
-        maxTickets: formData.maxTickets,
+        maxTickets: desiredTicketCount,
         isActive: true,
+        salesOpen: true,
+        numberRange,
+        status: 'scheduled',
         rules: 'Çekiliş kurallarını buradan güncelleyin.',
         createdAt: new Date(),
         updatedAt: new Date()
       });
 
-      await generateTickets(lotteryRef.id, formData.maxTickets);
+      await generateTickets(lotteryRef.id, desiredTicketCount, rangeMax);
 
       setShowCreateForm(false);
       const resetForm = {
@@ -415,16 +428,32 @@ export function AdminPanel() {
               />
             </div>
             <div className="form-group">
+              <label>Numara Aralığı</label>
+              <select
+                value={numberRange}
+                onChange={(e) => {
+                  const nextRange = e.target.value as '1-9' | '1-99';
+                  setNumberRange(nextRange);
+                  const cap = nextRange === '1-9' ? 59049 : 100000;
+                  setFormData(prev => ({ ...prev, maxTickets: Math.min(prev.maxTickets, cap) }));
+                }}
+              >
+                <option value="1-9">Her hane 1-9 (max 59,049 kombinasyon)</option>
+                <option value="1-99">Her hane 1-99 (max 100,000 kombinasyon)</option>
+              </select>
+              <small className="form-hint">Seçtiğin aralık 5 hane için benzersiz kombinasyonları belirler.</small>
+            </div>
+            <div className="form-group">
               <label>Maksimum Bilet Sayısı</label>
               <input
                 type="number"
                 value={formData.maxTickets}
                 onChange={(e) => setFormData({ ...formData, maxTickets: Number(e.target.value) })}
                 min="1"
-                max="10000"
+                max={maxTicketsCap}
                 required
               />
-              <small className="form-hint">Max 100,000 farklı kombinasyon mümkün (5 haneli, 0-9 arası)</small>
+              <small className="form-hint">Seçilen aralığa göre max {maxTicketsCap.toLocaleString('tr-TR')} benzersiz bilet.</small>
             </div>
             <button type="submit" className="create-button">
               Çekiliş Oluştur ve Biletleri Oluştur
@@ -812,6 +841,10 @@ export function AdminPanel() {
               <div className="setting-item">
                 <span className="setting-label">Bilet Fiyatı:</span>
                 <span className="setting-value">{lottery.ticketPrice} TL</span>
+              </div>
+              <div className="setting-item">
+                <span className="setting-label">Numara Aralığı:</span>
+                <span className="setting-value">{lottery.numberRange === '1-99' ? 'Her hane 1-99' : 'Her hane 1-9'}</span>
               </div>
               <div className="setting-item">
                 <span className="setting-label">Maksimum Bilet:</span>

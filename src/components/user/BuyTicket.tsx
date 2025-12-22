@@ -37,7 +37,8 @@ export function BuyTicket() {
           eventDate: toDateSafe(lotteryData.eventDate),
           createdAt: toDateSafe(lotteryData.createdAt),
           updatedAt: toDateSafe(lotteryData.updatedAt),
-          salesOpen: lotteryData.salesOpen ?? true
+          salesOpen: lotteryData.salesOpen ?? true,
+          numberRange: lotteryData.numberRange ?? '1-9'
         } as LotterySettings);
       } else {
         navigate('/');

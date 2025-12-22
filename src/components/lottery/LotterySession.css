@@ -383,6 +383,26 @@
   color: white;
 }
 
+.winner-user {
+  margin: 6px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffeaa7;
+}
+
+.winner-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.winner-sub {
+  margin: 0;
+  font-weight: 700;
+  color: #555;
+}
+
 .winner-card h2 {
   color: #333;
   font-size: 48px;
@@ -427,6 +447,47 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 24px;
+}
+
+.winner-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(2px);
+}
+
+.winner-modal {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 20px;
+  width: min(90vw, 520px);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.winner-burst {
+  font-size: 42px;
+  animation: burst 1.4s infinite;
+}
+
+@keyframes burst {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2) rotate(-6deg); }
+  100% { transform: scale(1); }
+}
+
+.winner-ticket {
+  margin: 12px 0;
+}
+
+.winner-note {
+  color: rgba(255,255,255,0.9);
+  font-weight: 600;
 }
 
 .side-column {
@@ -507,6 +568,19 @@
   font-size: 20px;
 }
 
+.sold-out-pill {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+  color: white;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(214, 48, 49, 0.25);
+}
+
 .controls-card {
   background: white;
   border-radius: 16px;
@@ -579,9 +653,15 @@
 
   .session-meta {
     align-items: flex-start;
+    font-size: 13px;
   }
 
   .tickets-grid {
     grid-template-columns: 1fr;
+  }
+
+  .winner-modal {
+    width: 90vw;
+    padding: 18px;
   }
 }

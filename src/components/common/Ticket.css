@@ -44,7 +44,7 @@
 
 
 .serial-number {
-  font-size:8px;
+  font-size:clamp(10px, 2.5vw, 8px);;
   font-weight: 900;
   color: #2f3c49;
   font-family: 'Courier New', monospace;
@@ -133,13 +133,35 @@
 /* Price Overlay */
 .ticket-price-overlay {
   position: absolute;
-  top: 10%;
-  right: 10%;
-  width: 30%;
+  top: 7%;
+  right: 7%;
+  width: 10%;
   height: 9%;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.ticket-price-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 4px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff7cf;
+  font-weight: 800;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.price-label {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.price-value {
+  font-size: 16px;
+  letter-spacing: 0.5px;
 }
 
 /* Status Badge - Floating */
@@ -210,11 +232,11 @@
   }
 
   .serial-number {
-    font-size: clamp(10px, 4vw, 18px);
+    font-size: clamp(4px, 4vw, 8px);
   }
 
   .ticket-number {
-    font-size: clamp(10px, 3vw, 16px);
+    font-size:  clamp(16px, 2.5vw, 22px);
   }
 
   .ticket-status-container {

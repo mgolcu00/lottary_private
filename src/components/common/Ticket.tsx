@@ -52,7 +52,12 @@ export function Ticket({ ticket, highlightedNumbers = [], highlightedIndices = [
 
       {/* Price */}
       <div className="ticket-price-overlay">
-        {/* Price will be shown here if needed */}
+        {ticket.price && (
+          <div className="">
+            <span className="price-value">{ticket.price}</span>
+            <span className="price-label">TL</span>
+          </div>
+        )}
       </div>
 
       {/* Status Badge - floating above ticket */}

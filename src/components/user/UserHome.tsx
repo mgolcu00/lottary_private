@@ -14,11 +14,22 @@ export function UserHome() {
   const navigate = useNavigate();
   const [selectedLottery, setSelectedLottery] = useState<LotterySettings | null>(null);
   const [userTickets, setUserTickets] = useState<TicketType[]>([]);
+  const [userTicketsLoading, setUserTicketsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [canBuyTickets, setCanBuyTickets] = useState(true);
+  const [lotteryStats, setLotteryStats] = useState({
+    total: 0,
+    sold: 0,
+    pending: 0,
+    available: 0,
+    percentSold: 0,
+    totalValue: 0
+  });
 
   useEffect(() => {
     if (!selectedLottery || !user) return;
+    setUserTicketsLoading(true);
 
     // Kullanıcının biletlerini dinle
     const ticketsQuery = query(
@@ -35,10 +46,45 @@ export function UserHome() {
         confirmedAt: doc.data().confirmedAt ? toDateSafe(doc.data().confirmedAt) : undefined
       } as TicketType));
       setUserTickets(tickets);
+      setUserTicketsLoading(false);
     });
 
     return unsubscribe;
   }, [selectedLottery, user]);
+
+  useEffect(() => {
+    if (!selectedLottery) return;
+    setStatsLoading(true);
+
+    const ticketsQuery = query(
+      collection(db, 'tickets'),
+      where('lotteryId', '==', selectedLottery.id)
+    );
+
+    const unsubscribe = onSnapshot(ticketsQuery, (snapshot) => {
+      const tickets = snapshot.docs.map(doc => doc.data() as TicketType);
+      const total = snapshot.size;
+      const sold = tickets.filter(t => t.status === 'confirmed').length;
+      const pending = tickets.filter(t => t.status === 'requested').length;
+      const available = tickets.filter(t => t.status === 'available').length;
+      const percentSold = selectedLottery.maxTickets
+        ? Math.min(100, ((sold / selectedLottery.maxTickets) * 100))
+        : 0;
+      const totalValue = (selectedLottery.ticketPrice || 0) * (selectedLottery.maxTickets || 0);
+
+      setLotteryStats({
+        total,
+        sold,
+        pending,
+        available,
+        percentSold,
+        totalValue
+      });
+      setStatsLoading(false);
+    });
+
+    return unsubscribe;
+  }, [selectedLottery]);
 
   useEffect(() => {
     if (!selectedLottery) return;
@@ -87,11 +133,16 @@ export function UserHome() {
     return <LotterySelector onSelect={setSelectedLottery} />;
   }
 
+  const soldOut = lotteryStats.available === 0 && lotteryStats.total > 0;
+  const currentValue = lotteryStats.sold * (selectedLottery.ticketPrice || 0);
+
   return (
     <div className="user-home">
       <header className="user-header">
         <div className="user-info">
+          <p className="eyebrow">Çekiliş Kontrol Merkezi</p>
           <h2>Merhaba, {user?.displayName}! 👋</h2>
+          <p className="subline">{selectedLottery.lotteryName}</p>
         </div>
         <div className="header-actions">
           <button onClick={handleBackToSelector} className="back-button">
@@ -103,44 +154,126 @@ export function UserHome() {
         </div>
       </header>
 
-      <div className="countdown-section">
-        <div className="countdown-card">
-          <div className="countdown-icon">🎊</div>
-          <h1>{selectedLottery.lotteryName || 'Yılbaşı Çekilişi'}</h1>
-          <div className="countdown-timer">
-            {timeLeft}
+      <section className="hero-grid">
+        <div className="hero-card glass">
+          <div className="hero-top">
+            <div>
+              <h1 className="hero-title">{selectedLottery.lotteryName || 'Çekiliş'}</h1>
+              <p className="hero-date">
+                {new Date(selectedLottery.eventDate).toLocaleString('tr-TR')}
+              </p>
+            </div>
+            <div className="time-block">
+              <span className="time-label">Çekilişe Kalan</span>
+              <div className="countdown-timer">{timeLeft || '—'}</div>
+              {!canBuyTickets && (
+                <div className="warning-message">⚠️ Bilet alma süresi doldu</div>
+              )}
+            </div>
           </div>
-          <p className="countdown-info">
-            Çekilişe kalan süre
-          </p>
-          {!canBuyTickets && (
-            <div className="warning-message">
-              ⚠️ Bilet alma süresi doldu
+
+          <div className="progress-wrap">
+            <div className="progress-head">
+              <span>Satış İlerlemesi</span>
+              <strong>%{lotteryStats.percentSold.toFixed(1)}</strong>
+            </div>
+            <div className="progress-track">
+              <div
+                className="progress-bar"
+                style={{ width: `${Math.min(100, lotteryStats.percentSold)}%` }}
+              />
+            </div>
+            {statsLoading ? (
+              <div className="progress-value-loader">
+                <div className="skeleton skeleton-line" />
+                <div className="skeleton skeleton-line" />
+              </div>
+            ) : (
+              <div className="value-rows">
+                <div className="value-row">
+                  <span>Anlık Değer</span>
+                  <strong>{currentValue.toLocaleString('tr-TR')} TL</strong>
+                </div>
+                <div className="value-row">
+                  <span>Hedef Değer</span>
+                  <strong>{lotteryStats.totalValue.toLocaleString('tr-TR')} TL</strong>
+                </div>
+              </div>
+            )}
+            <div className="progress-meta">
+              <span>Satılan: {lotteryStats.sold}</span>
+              <span>Kalan: {lotteryStats.available}</span>
+              {lotteryStats.pending > 0 && <span>Talep: {lotteryStats.pending}</span>}
+            </div>
+            {soldOut && <div className="sold-out-pill">Tüm biletler satıldı</div>}
+          </div>
+
+          <div className="hero-actions">
+            {canBuyTickets && !soldOut && (
+              <button className="primary-cta" onClick={handleBuyTicket}>
+                🎫 Bilet Al
+              </button>
+            )}
+            <button className="ghost-cta" onClick={handleGoToLottery}>
+              🎉 Canlı Çekiliş
+            </button>
+          </div>
+        </div>
+
+        <div className="stats-card">
+          {statsLoading ? (
+            <div className="stat-skeleton-grid">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton stat-skeleton" />
+              ))}
+            </div>
+          ) : (
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <span className="metric-label">Satılan</span>
+                <div className="metric-value">{lotteryStats.sold}</div>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Kalan</span>
+                <div className="metric-value">{lotteryStats.available}</div>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Talep</span>
+                <div className="metric-value">{lotteryStats.pending}</div>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Toplam Bilet</span>
+                <div className="metric-value">{selectedLottery.maxTickets}</div>
+              </div>
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       <div className="tickets-section">
         <div className="section-header">
-          <h2>Biletlerim</h2>
-          {canBuyTickets && userTickets.length === 0 && (
+          <div>
+            <p className="eyebrow">Biletlerin</p>
+            <h2>Biletlerim</h2>
+          </div>
+          {canBuyTickets && !soldOut && (
             <button onClick={handleBuyTicket} className="buy-button">
-              + Bilet Al
-            </button>
-          )}
-          {canBuyTickets && userTickets.length > 0 && (
-            <button onClick={handleBuyTicket} className="buy-button">
-              + Daha Fazla Bilet Al
+              {userTickets.length === 0 ? '+ Bilet Al' : '+ Daha Fazla Bilet Al'}
             </button>
           )}
         </div>
 
-        {userTickets.length === 0 ? (
+        {userTicketsLoading ? (
+          <div className="tickets-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="skeleton ticket-skeleton" />
+            ))}
+          </div>
+        ) : userTickets.length === 0 ? (
           <div className="empty-tickets">
             <div className="empty-icon">🎫</div>
             <p>Henüz biletiniz yok</p>
-            {canBuyTickets && (
+            {canBuyTickets && !soldOut && (
               <button onClick={handleBuyTicket} className="buy-button-large">
                 İlk Biletini Al
               </button>

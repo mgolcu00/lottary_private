@@ -26,7 +26,9 @@ export function LotterySelector({ onSelect }: LotterySelectorProps) {
           id: doc.id,
           eventDate: toDateSafe(data.eventDate),
           createdAt: toDateSafe(data.createdAt),
-          updatedAt: toDateSafe(data.updatedAt)
+          updatedAt: toDateSafe(data.updatedAt),
+          numberRange: data.numberRange ?? '1-9',
+          salesOpen: data.salesOpen ?? true
         } as LotterySettings;
       });
       setLotteries(lotteriesList);

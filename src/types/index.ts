@@ -14,6 +14,7 @@ export type LotterySettings = {
   maxTickets: number;
   isActive: boolean;
   salesOpen?: boolean;
+  numberRange?: '1-9' | '1-99';
   status?: 'scheduled' | 'active' | 'completed' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +27,7 @@ export type Ticket = {
   userName?: string;
   status: 'available' | 'requested' | 'confirmed' | 'expired';
   numbers: number[];
+  price?: number;
   requestedAt?: Date;
   confirmedAt?: Date;
   lotteryId: string;

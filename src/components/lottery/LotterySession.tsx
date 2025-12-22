@@ -27,6 +27,7 @@ export function LotterySession() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [viewersCount, setViewersCount] = useState(0);
   const [timeUntilStart, setTimeUntilStart] = useState<string>('');
+  const [winnerUser, setWinnerUser] = useState<{ name: string; email?: string } | null>(null);
 
   // Presence tracking
   useEffect(() => {
@@ -115,7 +116,9 @@ export function LotterySession() {
           id: snapshot.id,
           eventDate: toDateSafe(lotteryData.eventDate),
           createdAt: toDateSafe(lotteryData.createdAt),
-          updatedAt: toDateSafe(lotteryData.updatedAt)
+          updatedAt: toDateSafe(lotteryData.updatedAt),
+          numberRange: lotteryData.numberRange ?? '1-9',
+          salesOpen: lotteryData.salesOpen ?? true
         } as LotterySettings);
       }
     });
@@ -150,6 +153,7 @@ export function LotterySession() {
         } else {
           setWinner(null);
           setShowConfetti(false);
+          setWinnerUser(null);
         }
       }
     });
@@ -204,9 +208,11 @@ export function LotterySession() {
       setShowConfetti(true);
       const winnerTicket = userTickets.find(ticket => winnerTicketIds.includes(ticket.id));
       setWinner(winnerTicket || null);
+      setWinnerUser({ name: user?.displayName || 'Kullanıcı', email: user?.email || '' });
     } else {
       setShowConfetti(false);
       setWinner(null);
+      setWinnerUser(null);
     }
   };
 
@@ -260,6 +266,17 @@ export function LotterySession() {
         lastInvalidNumber: null
       });
       setIsDrawing(false);
+
+      if (winners.length === 0) {
+        setWinner(null);
+        setWinnerUser(null);
+        setShowConfetti(false);
+      } else {
+        const winnerTicket = winners[0];
+        setWinner(winnerTicket);
+        setWinnerUser({ name: winnerTicket.userName || 'Kazanan', email: '' });
+        setShowConfetti(true);
+      }
     }
   };
 
@@ -358,6 +375,12 @@ export function LotterySession() {
   const eventTime = new Date(lottery.eventDate).getTime();
   const now = new Date().getTime();
   const canStart = now >= eventTime || user?.isAdmin;
+  const isAdmin = !!user?.isAdmin;
+  const soldCount = allTickets.filter(t => t.status === 'confirmed').length;
+  const totalValue = lottery.ticketPrice * lottery.maxTickets;
+  const soldOut = availableCount === 0;
+  const potValue = soldCount * (lottery.ticketPrice || 0);
+  const isCurrentUserWinner = winner && userTickets.some(t => t.id === winner.id);
 
   if (!session && !canStart) {
     return (
@@ -380,7 +403,7 @@ export function LotterySession() {
           <div className="pre-stats">
             <div className="pre-stat">
               <span>Toplam Değer</span>
-              <strong>{lottery.ticketPrice * lottery.maxTickets} TL</strong>
+              <strong>{totalValue.toLocaleString('tr-TR')} TL</strong>
             </div>
             <div className="pre-stat">
               <span>Kalan Bilet</span>
@@ -388,9 +411,10 @@ export function LotterySession() {
             </div>
             <div className="pre-stat">
               <span>Satılan</span>
-              <strong>{allTickets.filter(t => t.status === 'confirmed').length}</strong>
+              <strong>{soldCount}</strong>
             </div>
           </div>
+          {soldOut && <div className="sold-out-pill">Tüm biletler satıldı</div>}
         </div>
         {renderRulesCard()}
       </div>
@@ -415,6 +439,21 @@ export function LotterySession() {
           <button onClick={startLottery} className="start-button">
             Çekilişi Şimdi Başlat
           </button>
+          <div className="pre-stats">
+            <div className="pre-stat">
+              <span>Toplam Değer</span>
+              <strong>{totalValue.toLocaleString('tr-TR')} TL</strong>
+            </div>
+            <div className="pre-stat">
+              <span>Satılan</span>
+              <strong>{soldCount}</strong>
+            </div>
+            <div className="pre-stat">
+              <span>Kalan</span>
+              <strong>{availableCount}</strong>
+            </div>
+          </div>
+          {soldOut && <div className="sold-out-pill">Tüm biletler satıldı</div>}
         </div>
         {renderRulesCard()}
       </div>
@@ -431,6 +470,7 @@ export function LotterySession() {
           <div className="lottery-icon">⏳</div>
           <h1>Çekiliş Bekleniyor</h1>
           <p>Yönetici çekilişi başlatmasını bekliyoruz...</p>
+          {soldOut && <div className="sold-out-pill">Tüm biletler satıldı</div>}
         </div>
         {renderRulesCard()}
       </div>
@@ -455,6 +495,20 @@ export function LotterySession() {
         </div>
       )}
 
+      {isCurrentUserWinner && winner && (
+        <div className="winner-overlay">
+          <div className="winner-modal">
+            <div className="winner-burst">✨</div>
+            <h2>Kazandın!</h2>
+            <p className="winner-amount">Toplam: {potValue.toLocaleString('tr-TR')} TL</p>
+            <div className="winner-ticket">
+              <Ticket ticket={winner} highlightedIndices={getHighlightIndices(winner)} />
+            </div>
+            <p className="winner-note">Kazanç bilgisi için admin seninle iletişime geçecek.</p>
+          </div>
+        </div>
+      )}
+
       <div className="viewers-badge-live">
         👥 {viewersCount} kişi izliyor
       </div>
@@ -466,11 +520,12 @@ export function LotterySession() {
               <p className="session-subtitle">{lottery.lotteryName || 'Çekiliş'}</p>
               <h1 className="session-title">Canlı Çekiliş</h1>
             </div>
-            <div className="session-meta">
-              <span>📅 {new Date(lottery.eventDate).toLocaleString('tr-TR')}</span>
-              <span>🎟️ {allTickets.length} onaylı bilet</span>
-            </div>
+          <div className="session-meta">
+            <span>📅 {new Date(lottery.eventDate).toLocaleString('tr-TR')}</span>
+            <span>🎟️ {allTickets.length} onaylı bilet</span>
+            <span>💰 Pot: {potValue.toLocaleString('tr-TR')} TL</span>
           </div>
+        </div>
 
           <div className="roller-area">
             <div className={`roller ${isDrawing ? 'spinning' : ''}`}>
@@ -483,7 +538,7 @@ export function LotterySession() {
             <div className="roller-status">
               {session.status === 'completed' ? (
                 <span className="status-pill success">Çekiliş tamamlandı</span>
-              ) : session.currentPhase === 'invalid' ? (
+              ) : session.currentPhase === 'invalid' && isAdmin ? (
                 <span className="status-pill danger">
                   Geçersiz numara: {invalidNumber ?? '-'} (prefix eşleşmedi)
                 </span>
@@ -491,7 +546,7 @@ export function LotterySession() {
                 <span className="status-pill info">Numara karıştırılıyor...</span>
               ) : (
                 <span className="status-pill info">
-                  Çekilen numara: {currentNumber ?? 'Hazırlanıyor'}
+                  Çekilen numara: {session.currentPhase === 'invalid' ? 'Hazırlanıyor' : (currentNumber ?? 'Hazırlanıyor')}
                 </span>
               )}
             </div>
@@ -528,6 +583,8 @@ export function LotterySession() {
                 <div className="winner-card user-winner">
                   <h2>🎊 TEBRİKLER! 🎊</h2>
                   <p className="winner-message">KAZANDINIZ!</p>
+                  <p className="winner-user">{winnerUser?.name || winner.userName || 'Kazanan'}</p>
+                  <div className="winner-amount">Kazanç: {potValue.toLocaleString('tr-TR')} TL</div>
                   <Ticket ticket={winner} highlightedIndices={getHighlightIndices(winner)} />
                 </div>
               ) : session.winnerTicketIds.length > 0 ? (
@@ -536,6 +593,7 @@ export function LotterySession() {
                   <p className="winner-message">
                     {session.winnerTicketIds.length} kazanan var
                   </p>
+                  <p className="winner-sub">Pot: {potValue.toLocaleString('tr-TR')} TL</p>
                 </div>
               ) : (
                 <div className="winner-card">
@@ -556,7 +614,7 @@ export function LotterySession() {
             </div>
             <div className="info-row">
               <span>📦 Onaylı Bilet</span>
-              <strong>{allTickets.filter(t => t.status === 'confirmed').length}</strong>
+              <strong>{soldCount}</strong>
             </div>
             <div className="info-row">
               <span>🔢 Çekilen Hane</span>
