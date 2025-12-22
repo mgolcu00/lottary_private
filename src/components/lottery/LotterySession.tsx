@@ -20,10 +20,8 @@ export function LotterySession() {
   const [allTickets, setAllTickets] = useState<TicketType[]>([]);
   const [availableCount, setAvailableCount] = useState(0);
   const [drawnNumbers, setDrawnNumbers] = useState<number[]>([]);
-  const [currentNumber, setCurrentNumber] = useState<number | null>(null);
+  const [_currentNumber, setCurrentNumber] = useState<number | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [invalidNumber, setInvalidNumber] = useState<number | null>(null);
-  const [pendingCandidate, setPendingCandidate] = useState<number | null>(null);
   const [winner, setWinner] = useState<TicketType | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [viewersCount, setViewersCount] = useState(0);
@@ -149,7 +147,6 @@ export function LotterySession() {
         setSession(normalizedSession);
         setDrawnNumbers(sessionData.drawnNumbers || []);
         setCurrentNumber(sessionData.currentNumber ?? null);
-        setInvalidNumber(sessionData.lastInvalidNumber ?? null);
         setIsDrawing(sessionData.currentPhase === 'drawing');
         setStage(sessionData.stage || (sessionData.status === 'completed' ? 'completed' : 'grand'));
         setAmortiFirst(sessionData.amortiFirstNumber ?? null);
@@ -241,25 +238,43 @@ export function LotterySession() {
     }
   };
 
-  const hasMatchingPrefix = (sequence: number[]) => {
+  // Akıllı algoritma: Mutlaka kazanan çıkacak şekilde numara seç
+  const getSmartNumber = (currentSequence: number[]): number => {
     const confirmedTickets = allTickets.filter(t => t.status === 'confirmed');
-    if (confirmedTickets.length === 0) return true;
-    return confirmedTickets.some(ticket =>
-      sequence.every((num, idx) => ticket.numbers[idx] === num)
+
+    // Eğer bilet yoksa random döndür
+    if (confirmedTickets.length === 0) {
+      return Math.floor(Math.random() * 9) + 1;
+    }
+
+    // Şu ana kadar çekilen sequence ile eşleşen biletleri bul
+    const matchingTickets = confirmedTickets.filter(ticket =>
+      currentSequence.every((num, idx) => ticket.numbers[idx] === num)
     );
+
+    // Eğer eşleşen bilet kalmadıysa (bu olmamalı), random döndür
+    if (matchingTickets.length === 0) {
+      console.warn('No matching tickets found! Drawing random number.');
+      return Math.floor(Math.random() * 9) + 1;
+    }
+
+    // Eşleşen biletlerin bir sonraki pozisyonundaki numaraları topla
+    const nextPosition = currentSequence.length;
+    const possibleNumbers = matchingTickets.map(ticket => ticket.numbers[nextPosition]);
+
+    // Bu sayılardan birini random seç
+    const randomIndex = Math.floor(Math.random() * possibleNumbers.length);
+    return possibleNumbers[randomIndex];
   };
 
   const acceptNumber = async (sessionId: string, candidate: number, currentDrawn: number[]) => {
     const nextDrawn = [...currentDrawn, candidate];
     setCurrentNumber(candidate);
-    setInvalidNumber(null);
-    setPendingCandidate(null);
 
     await updateDoc(doc(db, 'lotterySessions', sessionId), {
       currentPhase: 'reveal',
       currentNumber: candidate,
-      drawnNumbers: nextDrawn,
-      lastInvalidNumber: null
+      drawnNumbers: nextDrawn
     });
 
     if (nextDrawn.length === 5) {
@@ -270,8 +285,7 @@ export function LotterySession() {
         stage: 'completed',
         winnerTicketIds: winners.map(t => t.id),
         completedAt: new Date(),
-        currentNumber: null,
-        lastInvalidNumber: null
+        currentNumber: null
       });
       setIsDrawing(false);
 
@@ -286,49 +300,25 @@ export function LotterySession() {
     }
   };
 
-  const drawNumber = async (maxAttempts = 5000) => {
+  const drawNumber = async () => {
     if (!user?.isAdmin || !session || session.status !== 'active' || stage !== 'grand') return;
-    if (drawnNumbers.length >= 5 || pendingCandidate !== null) return;
+    if (drawnNumbers.length >= 5) return;
 
     setIsDrawing(true);
-    setInvalidNumber(null);
     setCurrentNumber(null);
 
     // Uzun ve efektli animasyon başlat
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Akıllı algoritma: Her pozisyon için mutlaka eşleşen bir sayı bul
-    // 1. numara için: En az 1 bilettte 1. pozisyonda bu sayı olmalı
-    // 2. numara için: En az 1 bilettte 1. ve 2. pozisyonlar eşleşmeli
-    // 3-5. numara için: Aynı mantık devam eder
-    let attempts = 0;
-    let candidate = 0;
-    let valid = false;
+    // Akıllı algoritma kullan: Mutlaka eşleşen bilet olacak şekilde numara seç
+    const candidate = getSmartNumber(drawnNumbers);
 
-    while (attempts < maxAttempts && !valid) {
-      candidate = Math.floor(Math.random() * 9) + 1;
-      const sequence = [...drawnNumbers, candidate];
-      valid = hasMatchingPrefix(sequence);
-      attempts++;
-
-      // Eğer valid değilse, arka planda hızlıca tekrar dene
-      if (!valid && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-    }
-
-    // Eğer maxAttempts'e rağmen bulunamadıysa (çok nadir),
-    // rastgele bir sayı kabul et (çekiliş tıkanmasın)
-    if (!valid) {
-      console.warn(`Could not find valid number after ${maxAttempts} attempts`);
-      candidate = Math.floor(Math.random() * 9) + 1;
-    }
+    console.log(`Drew number ${candidate} at position ${drawnNumbers.length + 1}. Guaranteed to match at least one ticket.`);
 
     // Valid sayıyı göster
     await updateDoc(doc(db, 'lotterySessions', session.id), {
       currentPhase: 'reveal',
       currentNumber: candidate,
-      lastInvalidNumber: null,
       drawnNumbers
     });
 
@@ -339,16 +329,6 @@ export function LotterySession() {
     setIsDrawing(false);
   };
 
-  const retryDraw = () => {
-    setPendingCandidate(null);
-    setInvalidNumber(null);
-    drawNumber();
-  };
-
-  const acceptInvalid = () => {
-    if (!session || pendingCandidate === null) return;
-    acceptNumber(session.id, pendingCandidate, drawnNumbers);
-  };
 
   const drawAmortiFirst = async () => {
     if (!user?.isAdmin || !session || stage !== 'amorti1') return;
@@ -395,21 +375,31 @@ export function LotterySession() {
     setAmortiSecond(candidate);
     setCurrentNumber(candidate);
 
-    // Amorti çekildikten sonra büyük ödül için çekilişi SIFIRLA
+    // Amorti numarasını kaydet ama stage değiştirme - admin manuel geçecek
     await updateDoc(doc(db, 'lotterySessions', session.id), {
       amortiSecondNumber: candidate,
-      stage: 'grand',
-      currentPhase: 'drawing',
-      currentNumber: null,
-      drawnNumbers: [], // SIFIRLA - büyük ödül için baştan başla
-      lastInvalidNumber: null
+      currentPhase: 'reveal',
+      currentNumber: candidate
     });
 
     // Numarayı gösterdikten sonra kısa bir süre bekle
     await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsDrawing(false);
+  };
+
+  // Amortiden büyük ödüle geçiş için manuel buton
+  const transitionToGrandPrize = async () => {
+    if (!user?.isAdmin || !session || stage !== 'amorti2') return;
+
+    await updateDoc(doc(db, 'lotterySessions', session.id), {
+      stage: 'grand',
+      currentPhase: 'drawing',
+      currentNumber: null,
+      drawnNumbers: [] // SIFIRLA - büyük ödül için baştan başla
+    });
+
     setDrawnNumbers([]); // Local state'i de sıfırla
     setCurrentNumber(null);
-    setIsDrawing(false);
   };
 
   const findWinners = (drawnNumbers: number[]): TicketType[] => {
@@ -475,7 +465,6 @@ export function LotterySession() {
   const eventTime = new Date(lottery.eventDate).getTime();
   const now = new Date().getTime();
   const canStart = now >= eventTime || user?.isAdmin;
-  const isAdmin = !!user?.isAdmin;
   const soldCount = allTickets.filter(t => t.status === 'confirmed').length;
   const totalValue = lottery.ticketPrice * lottery.maxTickets;
   const soldOut = availableCount === 0;
@@ -907,12 +896,6 @@ export function LotterySession() {
               <span>🏷️ Amorti Kazanan</span>
               <strong>{amortiWinners.length}</strong>
             </div>
-            {invalidNumber !== null && session.currentPhase === 'invalid' && (
-              <div className="info-row danger-text">
-                <span>Geçersiz</span>
-                <strong>{invalidNumber}</strong>
-              </div>
-            )}
           </div>
           {user?.isAdmin && session.status === 'active' && (
             <div className="controls-card">
@@ -924,31 +907,32 @@ export function LotterySession() {
                 </div>
               )}
               {stage === 'amorti2' && (
-                <div className="controls-row">
-                  <button className="primary-button wide" onClick={drawAmortiSecond}>
-                    Amorti #2 (5-9) Çek
-                  </button>
-                </div>
+                <>
+                  {amortiSecond === null ? (
+                    <div className="controls-row">
+                      <button className="primary-button wide" onClick={drawAmortiSecond}>
+                        Amorti #2 (5-9) Çek
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="controls-row">
+                      <button className="success-button wide" onClick={transitionToGrandPrize}>
+                        ✨ Büyük Ödüle Geç
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
               {stage === 'grand' && (
               <div className="controls-row">
                 <button
                   className="primary-button wide"
                   onClick={drawNumber}
-                  disabled={drawnNumbers.length >= 5 || pendingCandidate !== null}
+                  disabled={drawnNumbers.length >= 5}
                 >
                   {drawnNumbers.length >= 5 ? 'Tüm numaralar çekildi' : 'Numara Çek'}
                 </button>
               </div>
-              )}
-              {pendingCandidate !== null && (
-                <div className="invalid-box">
-                  <p>Geçersiz numara: {pendingCandidate}. Prefix eşleşmedi.</p>
-                  <div className="controls-row">
-                    <button className="secondary-button" onClick={retryDraw}>Tekrar Çek</button>
-                    <button className="primary-button" onClick={acceptInvalid}>Devam Et</button>
-                  </div>
-                </div>
               )}
               <div className="controls-row">
                 <button

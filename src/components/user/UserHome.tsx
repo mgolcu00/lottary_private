@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings, LotterySession } from '../../types';
@@ -16,7 +16,7 @@ export function UserHome() {
   const [selectedLottery, setSelectedLottery] = useState<LotterySettings | null>(null);
   const [userTickets, setUserTickets] = useState<TicketType[]>([]);
   const [userTicketsLoading, setUserTicketsLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [_statsLoading, setStatsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [canBuyTickets, setCanBuyTickets] = useState(true);
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -148,10 +148,6 @@ export function UserHome() {
 
   const handleGoToLottery = () => {
     navigate(`/lottery?lotteryId=${selectedLottery?.id}`);
-  };
-
-  const handleBackToSelector = () => {
-    setSelectedLottery(null);
   };
 
   if (!selectedLottery) {

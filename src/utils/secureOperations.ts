@@ -9,9 +9,11 @@ import { ValidationError } from './validation';
  * Error types for better error handling
  */
 export class DatabaseError extends Error {
-  constructor(message: string, public code?: string) {
+  code?: string;
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'DatabaseError';
+    this.code = code;
   }
 }
 
@@ -147,7 +149,7 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   waitMs: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
 
   return (...args: Parameters<T>) => {
     if (timeout) {
