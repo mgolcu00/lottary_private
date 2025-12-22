@@ -673,22 +673,30 @@
 }
 
 .pre-stat {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 12px;
-  padding: 12px;
-  backdrop-filter: blur(6px);
+  padding: 16px;
+  backdrop-filter: blur(10px);
   color: white;
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 2px solid rgba(255,255,255,0.35);
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .pre-stat span {
   display: block;
-  opacity: 0.8;
-  font-weight: 600;
+  opacity: 0.95;
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .pre-stat strong {
-  font-size: 20px;
+  font-size: 24px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .sold-out-pill {
@@ -786,5 +794,674 @@
   .winner-modal {
     width: 90vw;
     padding: 18px;
+  }
+}
+
+/* ============================================
+   5 TÜP SİSTEMİ - Türkiye Milli Piyango Tarzı
+   ============================================ */
+
+.stage-indicator {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.stage-badge {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: 25px;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stage-amorti {
+  background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.stage-grand {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.stage-completed {
+  background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 184, 148, 0.3);
+}
+
+/* Tüpler Container */
+.tubes-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 40px 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.1) 100%);
+  border-radius: 20px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.tube-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tube-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Tüp Görselleştirmesi */
+.tube {
+  position: relative;
+  width: 80px;
+  height: 120px;
+}
+
+.tube-body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-radius: 40px;
+  overflow: hidden;
+  box-shadow: 
+    inset 0 2px 10px rgba(0, 0, 0, 0.3),
+    0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.tube-inner {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tube-ball {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 28px;
+  font-weight: 900;
+  color: #312e81;
+  transition: all 0.4s ease;
+}
+
+.tube-filled .tube-ball {
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+  color: #1a1a1a;
+  box-shadow: 
+    0 6px 20px rgba(255, 215, 0, 0.5),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.2);
+  animation: ball-pop 0.5s ease;
+}
+
+@keyframes ball-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.tube-spinning .tube-ball {
+  animation: ball-spin 0.8s infinite;
+}
+
+@keyframes ball-spin {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-10px) scale(0.9);
+  }
+  50% {
+    transform: translateY(10px) scale(1.1);
+  }
+  75% {
+    transform: translateY(-5px) scale(0.95);
+  }
+}
+
+.ball-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.ball-spinning {
+  animation: question-pulse 0.5s infinite;
+}
+
+@keyframes question-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+.ball-empty {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 32px;
+}
+
+/* Tube Shine Effect */
+.tube-shine {
+  position: absolute;
+  top: 0;
+  left: 10%;
+  width: 30%;
+  height: 60%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* Drawing Status */
+.drawing-status {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.status-message {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.status-drawing {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  animation: pulse-status 1.5s infinite;
+}
+
+.status-success {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.status-info {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c4b5fd;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+@keyframes pulse-status {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Responsive - Mobil için */
+@media (max-width: 640px) {
+  .tubes-container {
+    gap: 8px;
+    padding: 30px 10px;
+  }
+
+  .tube {
+    width: 60px;
+    height: 100px;
+  }
+
+  .tube-ball {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+
+  .tube-label {
+    font-size: 10px;
+  }
+
+  .stage-badge {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+
+  .status-message {
+    padding: 10px 20px;
+    font-size: 13px;
+  }
+}
+
+/* Tablet için */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .tube {
+    width: 70px;
+    height: 110px;
+  }
+
+  .tube-ball {
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+  }
+}
+
+/* Amorti İki Tüp Yan Yana */
+.amorti-tube-container {
+  display: flex;
+  justify-content: center;
+  gap: 60px;
+  flex-wrap: wrap;
+}
+
+.amorti-tube-wrapper {
+  transform: scale(1.2);
+}
+
+.tube-label-amorti {
+  font-size: 16px;
+  font-weight: 800;
+  color: #6c5ce7;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.tube-large {
+  width: 120px;
+  height: 160px;
+}
+
+.tube-large .tube-ball {
+  width: 80px;
+  height: 80px;
+  font-size: 42px;
+}
+
+@media (max-width: 640px) {
+  .amorti-tube-wrapper {
+    transform: scale(1.1);
+  }
+
+  .tube-label-amorti {
+    font-size: 14px;
+  }
+
+  .tube-large {
+    width: 100px;
+    height: 140px;
+  }
+
+  .tube-large .tube-ball {
+    width: 66px;
+    height: 66px;
+    font-size: 36px;
+  }
+}
+
+/* Sonuç Ekranında Kazanan Bilet Gösterimi */
+.winner-ticket-display {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.winner-ticket-display .ticket-container {
+  max-width: 350px;
+  width: 100%;
+}
+
+/* ==================== RESULTS SCREEN - CHRISTMAS GREEN THEME ==================== */
+
+.results-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #059669 0%, #10b981 50%, #059669 100%);
+  padding: 20px;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.results-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* Header */
+.results-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.results-title {
+  font-size: 36px;
+  font-weight: 900;
+  color: white;
+  margin: 0 0 12px 0;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+.results-subtitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0 0 8px 0;
+}
+
+.results-date {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+}
+
+/* Section Title */
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.section-title h2 {
+  font-size: 24px;
+  font-weight: 900;
+  color: white;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.title-icon {
+  font-size: 32px;
+  animation: rotate-gentle 4s ease-in-out infinite;
+}
+
+@keyframes rotate-gentle {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(15deg); }
+}
+
+/* Grand Prize Section */
+.grand-prize-section {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.grand-winner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.grand-winner-ticket {
+  width: 100%;
+  max-width: 400px;
+  transform: scale(1.1);
+  animation: ticket-spotlight 2s ease-in-out infinite;
+}
+
+@keyframes ticket-spotlight {
+  0%, 100% {
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 40px rgba(255, 215, 0, 0.9));
+  }
+}
+
+.grand-winner-info {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 20px;
+}
+
+.winner-badge {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-radius: 16px;
+  padding: 16px 24px;
+  box-shadow: 0 8px 24px rgba(251, 191, 36, 0.4);
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 24px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 12px 32px rgba(251, 191, 36, 0.6);
+  }
+}
+
+.badge-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.badge-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-name {
+  font-size: 18px;
+  font-weight: 900;
+  color: #1e293b;
+}
+
+.badge-amount {
+  font-size: 20px;
+  font-weight: 900;
+  color: #dc2626;
+}
+
+/* No Winner Card */
+.no-winner-card {
+  text-align: center;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.no-winner-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 8px 0;
+}
+
+.no-winner-subtext {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+}
+
+/* Amorti Section */
+.amorti-section {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.amorti-title h2 {
+  font-size: 20px;
+}
+
+.amorti-numbers {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.amorti-number-badge {
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.amorti-number-badge strong {
+  font-size: 24px;
+  font-weight: 900;
+  margin-left: 8px;
+}
+
+.amorti-winners-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.amorti-winner-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.amorti-winner-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.amorti-winner-prize {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fbbf24;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  padding: 8px 20px;
+  background: rgba(251, 191, 36, 0.2);
+  border-radius: 20px;
+  border: 2px solid rgba(251, 191, 36, 0.5);
+}
+
+/* Results Footer */
+.results-footer {
+  text-align: center;
+  margin-top: 32px;
+}
+
+.results-home-button {
+  padding: 16px 32px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 3px solid rgba(255, 255, 255, 1);
+  border-radius: 50px;
+  color: #059669;
+  font-weight: 900;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.results-home-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  background: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .results-title {
+    font-size: 28px;
+  }
+
+  .section-title h2 {
+    font-size: 20px;
+  }
+
+  .title-icon {
+    font-size: 24px;
+  }
+
+  .grand-prize-section,
+  .amorti-section {
+    padding: 20px;
+  }
+
+  .grand-winner-ticket {
+    max-width: 100%;
+    transform: scale(1);
+  }
+
+  .amorti-winners-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-home-button {
+    width: 100%;
+    justify-content: center;
   }
 }

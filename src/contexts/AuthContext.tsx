@@ -38,7 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           uid: firebaseUser.uid,
           email: firebaseUser.email!,
           displayName: userData?.displayName || firebaseUser.displayName || '',
-          isAdmin: userData?.isAdmin || false
+          isAdmin: userData?.isAdmin || false,
+          termsAccepted: userData?.termsAccepted || false,
+          termsAcceptedAt: userData?.termsAcceptedAt,
+          isOver18: userData?.isOver18 || false
         });
       } else {
         setUser(null);

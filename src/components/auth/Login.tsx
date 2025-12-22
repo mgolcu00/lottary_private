@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import logoImage from '../../assets/raw_logo.png';
 import './Login.css';
 
 // Snowflakes for Christmas theme
@@ -71,7 +72,9 @@ export function Login() {
       <div className="login-container">
         <Snowflakes />
         <div className="login-card">
-          <div className="lottery-icon">🎟️</div>
+          <div className="login-logo-wrapper">
+            <img src={logoImage} alt="Dijital Piyango" className="login-logo" />
+          </div>
           <h1>Email Gönderildi!</h1>
           <p className="success-message">
             <strong>{email}</strong> adresine giriş linki gönderdik.
@@ -93,7 +96,9 @@ export function Login() {
     <div className="login-container">
       <Snowflakes />
       <div className="login-card">
-        <div className="lottery-icon">🎟️</div>
+        <div className="login-logo-wrapper">
+          <img src={logoImage} alt="Dijital Piyango" className="login-logo" />
+        </div>
         <h1>Yılbaşı Çekilişi</h1>
         <p className="subtitle">Giriş yaparak çekilişe katılabilirsiniz</p>
 

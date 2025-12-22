@@ -3,12 +3,16 @@ export type User = {
   email: string;
   displayName: string;
   isAdmin?: boolean;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: Date;
+  isOver18?: boolean;
 };
 
 export type LotterySettings = {
   id: string;
   lotteryName?: string;
   rules?: string;
+  disclaimerText?: string;
   eventDate: Date;
   ticketPrice: number;
   maxTickets: number;

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/auth/Login';
 import { CompleteSignIn } from './components/auth/CompleteSignIn';
 import { NameSetup } from './components/auth/NameSetup';
+import { DisclaimerPage } from './components/auth/DisclaimerPage';
 import { UserHome } from './components/user/UserHome';
 import { BuyTicket } from './components/user/BuyTicket';
 import { AdminPanel } from './components/admin/AdminPanel';
@@ -28,6 +29,11 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   if (!user.displayName) {
     return <Navigate to="/setup-name" />;
+  }
+
+  // Kullanıcı şartları kabul etmemişse yönlendir
+  if (!user.termsAccepted) {
+    return <Navigate to="/disclaimer" />;
   }
 
   return <>{children}</>;
@@ -77,6 +83,16 @@ function AppRoutes() {
         path="/setup-name"
         element={
           user && !user.displayName ? <NameSetup /> : <Navigate to="/" />
+        }
+      />
+      <Route
+        path="/disclaimer"
+        element={
+          user && user.displayName && !user.termsAccepted ? (
+            <DisclaimerPage />
+          ) : (
+            <Navigate to="/" />
+          )
         }
       />
       <Route

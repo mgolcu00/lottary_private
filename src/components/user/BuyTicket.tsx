@@ -5,7 +5,10 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings } from '../../types';
 import { Ticket } from '../common/Ticket';
+import { Snowflakes, ChristmasDecorations } from '../common/ChristmasEffects';
 import { toDateSafe } from '../../utils/date';
+import { ticketRequestLimiter, ValidationError } from '../../utils/validation';
+import { secureTicketPurchase } from '../../utils/secureOperations';
 import './BuyTicket.css';
 
 export function BuyTicket() {
@@ -81,9 +84,36 @@ export function BuyTicket() {
   const handleRequestTicket = async () => {
     if (!selectedTicket || !user || !lottery) return;
 
+    // Rate limiting check
+    if (!ticketRequestLimiter.isAllowed(user.uid)) {
+      alert('Çok fazla istek gönderdiniz. Lütfen bir dakika bekleyin.');
+      return;
+    }
+
+    // Validate lottery state
+    if (lottery.salesOpen === false) {
+      alert('Satışlar kapalı.');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Bilet isteği oluştur
+      // Use secure transaction-based ticket purchase
+      const ticketRef = doc(db, 'tickets', selectedTicket.id);
+      const result = await secureTicketPurchase(
+        db,
+        ticketRef,
+        user.uid,
+        user.displayName || 'Unknown'
+      );
+
+      if (!result.success) {
+        alert(result.error || 'Bilet satın alınamadı');
+        setLoading(false);
+        return;
+      }
+
+      // Create ticket request record after successful ticket lock
       await addDoc(collection(db, 'ticketRequests'), {
         ticketId: selectedTicket.id,
         ticketNumber: selectedTicket.ticketNumber,
@@ -95,19 +125,16 @@ export function BuyTicket() {
         lotteryId: lottery.id
       });
 
-      // Bileti requested olarak işaretle
-      await updateDoc(doc(db, 'tickets', selectedTicket.id), {
-        status: 'requested',
-        userId: user.uid,
-        userName: user.displayName,
-        requestedAt: new Date()
-      });
-
       setShowRequestModal(false);
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error requesting ticket:', error);
-      alert('Bilet isteği gönderilemedi. Lütfen tekrar deneyin.');
+
+      if (error instanceof ValidationError) {
+        alert(error.message);
+      } else {
+        alert('Bilet isteği gönderilemedi. Lütfen tekrar deneyin.');
+      }
     }
     setLoading(false);
   };
@@ -118,11 +145,11 @@ export function BuyTicket() {
 
   return (
     <div className="buy-ticket-page">
+      <Snowflakes />
+      <ChristmasDecorations />
+
       <div className="buy-ticket-container">
         <div className="buy-ticket-header">
-          <button onClick={() => navigate('/')} className="back-button">
-            ← Geri
-          </button>
           <h1>Bilet Seç</h1>
           <div className="price-tag">
             💰 {lottery.ticketPrice} TL

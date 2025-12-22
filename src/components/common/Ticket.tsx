@@ -7,10 +7,20 @@ interface TicketProps {
   highlightedIndices?: number[];
   showStatus?: boolean;
   onClick?: () => void;
+  isAmortiWinner?: boolean;
+  isGrandWinner?: boolean;
 }
 
-export function Ticket({ ticket, highlightedNumbers = [], highlightedIndices = [], showStatus = true, onClick }: TicketProps) {
+export function Ticket({ ticket, highlightedNumbers = [], highlightedIndices = [], showStatus = true, onClick, isAmortiWinner = false, isGrandWinner = false }: TicketProps) {
   const getStatusBadge = () => {
+    // Önce kazanan badge'leri göster
+    if (isGrandWinner) {
+      return <div className="ticket-status-badge badge-grand-winner">🏆 BÜYÜK ÖDÜL!</div>;
+    }
+    if (isAmortiWinner) {
+      return <div className="ticket-status-badge badge-amorti-winner">🎗️ AMORTİ KAZANDI</div>;
+    }
+
     switch (ticket.status) {
       case 'requested':
         return <div className="ticket-status-badge badge-pending">Bekliyor</div>;
@@ -27,7 +37,7 @@ export function Ticket({ ticket, highlightedNumbers = [], highlightedIndices = [
     highlightedNumbers.includes(num) || highlightedIndices.includes(idx);
 
   return (
-    <div className={`ticket-container ${onClick ? 'clickable' : ''}`} onClick={onClick}>
+    <div className={`ticket-container ${onClick ? 'clickable' : ''} ${isAmortiWinner ? 'amorti-winner-ticket' : ''} ${isGrandWinner ? 'grand-winner-ticket' : ''}`} onClick={onClick}>
       {/* Background image will be ticket_1_5.png */}
       <div className="ticket-background">
         <img src="/src/assets/ticket_2_5.png" alt="Lottery Ticket" />

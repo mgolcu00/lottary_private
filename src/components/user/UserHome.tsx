@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Ticket as TicketType, LotterySettings } from '../../types';
+import { Ticket as TicketType, LotterySettings, LotterySession } from '../../types';
 import { Ticket } from '../common/Ticket';
 import { LotterySelector } from './LotterySelector';
+import { Snowflakes, ChristmasDecorations, ChristmasLights } from '../common/ChristmasEffects';
 import { toDateSafe } from '../../utils/date';
 import './UserHome.css';
 
 export function UserHome() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedLottery, setSelectedLottery] = useState<LotterySettings | null>(null);
   const [userTickets, setUserTickets] = useState<TicketType[]>([]);
@@ -18,6 +19,8 @@ export function UserHome() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [canBuyTickets, setCanBuyTickets] = useState(true);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [lotterySession, setLotterySession] = useState<LotterySession | null>(null);
   const [lotteryStats, setLotteryStats] = useState({
     total: 0,
     sold: 0,
@@ -26,6 +29,27 @@ export function UserHome() {
     percentSold: 0,
     totalValue: 0
   });
+
+  // Listen to lottery session
+  useEffect(() => {
+    if (!selectedLottery) return;
+
+    const sessionQuery = query(
+      collection(db, 'lotterySessions'),
+      where('lotteryId', '==', selectedLottery.id)
+    );
+
+    const unsubscribe = onSnapshot(sessionQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const sessionData = snapshot.docs[0].data() as LotterySession;
+        setLotterySession({ ...sessionData, id: snapshot.docs[0].id });
+      } else {
+        setLotterySession(null);
+      }
+    });
+
+    return unsubscribe;
+  }, [selectedLottery]);
 
   useEffect(() => {
     if (!selectedLottery || !user) return;
@@ -45,6 +69,7 @@ export function UserHome() {
         requestedAt: doc.data().requestedAt ? toDateSafe(doc.data().requestedAt) : undefined,
         confirmedAt: doc.data().confirmedAt ? toDateSafe(doc.data().confirmedAt) : undefined
       } as TicketType));
+
       setUserTickets(tickets);
       setUserTicketsLoading(false);
     });
@@ -138,160 +163,194 @@ export function UserHome() {
 
   return (
     <div className="user-home">
-      <header className="user-header">
-        <div className="user-info">
-          <p className="eyebrow">Çekiliş Kontrol Merkezi</p>
-          <h2>Merhaba, {user?.displayName}! 👋</h2>
-          <p className="subline">{selectedLottery.lotteryName}</p>
-        </div>
-        <div className="header-actions">
-          <button onClick={handleBackToSelector} className="back-button">
-            ← Çekilişler
-          </button>
-          <button onClick={signOut} className="logout-button">
-            Çıkış Yap
-          </button>
-        </div>
-      </header>
+      <Snowflakes />
+      <ChristmasDecorations />
+      <ChristmasLights />
 
-      <section className="hero-grid">
-        <div className="hero-card glass">
-          <div className="hero-top">
-            <div>
-              <h1 className="hero-title">{selectedLottery.lotteryName || 'Çekiliş'}</h1>
-              <p className="hero-date">
-                {new Date(selectedLottery.eventDate).toLocaleString('tr-TR')}
+      <div className="user-home-content">
+        {/* Main Card - Lottery Info */}
+        <div className="lottery-main-card">
+          <div className="card-header">
+            <div className="event-info">
+              <h2 className="event-name">{selectedLottery.lotteryName}</h2>
+              <p className="event-date">
+                {new Date(selectedLottery.eventDate).toLocaleString('tr-TR', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
               </p>
             </div>
-            <div className="time-block">
-              <span className="time-label">Çekilişe Kalan</span>
-              <div className="countdown-timer">{timeLeft || '—'}</div>
-              {!canBuyTickets && (
-                <div className="warning-message">⚠️ Bilet alma süresi doldu</div>
+          </div>
+
+          {/* Countdown */}
+          <div className="countdown-section">
+            <p className="countdown-label">Çekilişe Kalan Süre</p>
+            <div className="countdown-display">{timeLeft || 'Yükleniyor...'}</div>
+            {!canBuyTickets && timeLeft !== 'Çekiliş başladı!' && (
+              <div className="countdown-warning">
+                ⚠️ Bilet satışı kapandı
+              </div>
+            )}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="sales-progress">
+            <div className="progress-header">
+              <span className="progress-title">Satış Durumu</span>
+              <span className="progress-percent">{lotteryStats.percentSold.toFixed(1)}%</span>
+            </div>
+            <div className="progress-bar-container">
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${Math.min(100, lotteryStats.percentSold)}%` }}
+              />
+            </div>
+            <div className="progress-stats">
+              <div className="stat-item">
+                <span className="stat-label">Satılan</span>
+                <span className="stat-value">{lotteryStats.sold}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Kalan</span>
+                <span className="stat-value">{lotteryStats.available}</span>
+              </div>
+              {lotteryStats.pending > 0 && (
+                <div className="stat-item">
+                  <span className="stat-label">Bekleyen</span>
+                  <span className="stat-value">{lotteryStats.pending}</span>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="progress-wrap">
-            <div className="progress-head">
-              <span>Satış İlerlemesi</span>
-              <strong>%{lotteryStats.percentSold.toFixed(1)}</strong>
-            </div>
-            <div className="progress-track">
-              <div
-                className="progress-bar"
-                style={{ width: `${Math.min(100, lotteryStats.percentSold)}%` }}
-              />
-            </div>
-            {statsLoading ? (
-              <div className="progress-value-loader">
-                <div className="skeleton skeleton-line" />
-                <div className="skeleton skeleton-line" />
-              </div>
-            ) : (
-              <div className="value-rows">
-                <div className="value-row">
-                  <span>Anlık Değer</span>
-                  <strong>{currentValue.toLocaleString('tr-TR')} TL</strong>
-                </div>
-                <div className="value-row">
-                  <span>Hedef Değer</span>
-                  <strong>{lotteryStats.totalValue.toLocaleString('tr-TR')} TL</strong>
-                </div>
-              </div>
-            )}
-            <div className="progress-meta">
-              <span>Satılan: {lotteryStats.sold}</span>
-              <span>Kalan: {lotteryStats.available}</span>
-              {lotteryStats.pending > 0 && <span>Talep: {lotteryStats.pending}</span>}
-            </div>
-            {soldOut && <div className="sold-out-pill">Tüm biletler satıldı</div>}
-          </div>
-
-          <div className="hero-actions">
+          {/* Action Buttons */}
+          <div className="card-actions">
             {canBuyTickets && !soldOut && (
-              <button className="primary-cta" onClick={handleBuyTicket}>
-                🎫 Bilet Al
+              <button className="btn-primary" onClick={handleBuyTicket}>
+                🎫 Bilet Satın Al
               </button>
             )}
-            <button className="ghost-cta" onClick={handleGoToLottery}>
-              🎉 Canlı Çekiliş
+            <button className="btn-secondary" onClick={handleGoToLottery}>
+              📺 Canlı Yayını İzle
             </button>
+            <button className="btn-rules" onClick={() => setShowRulesModal(true)}>
+              📋 Kuralları Gör
+            </button>
+          </div>
+
+          {soldOut && (
+            <div className="sold-out-badge">
+              🔥 Tüm Biletler Satıldı!
+            </div>
+          )}
+        </div>
+
+        {/* Stats Grid */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon">💰</div>
+            <div className="stat-content">
+              <p className="stat-label">Toplam Kasa</p>
+              <p className="stat-value">{lotteryStats.totalValue.toLocaleString('tr-TR')} TL</p>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">📊</div>
+            <div className="stat-content">
+              <p className="stat-label">Mevcut Değer</p>
+              <p className="stat-value">{currentValue.toLocaleString('tr-TR')} TL</p>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">🎟️</div>
+            <div className="stat-content">
+              <p className="stat-label">Bilet Sayısı</p>
+              <p className="stat-value">{selectedLottery.maxTickets}</p>
+            </div>
           </div>
         </div>
 
-        <div className="stats-card">
-          {statsLoading ? (
-            <div className="stat-skeleton-grid">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="skeleton stat-skeleton" />
+        {/* User Tickets Section */}
+        <div className="my-tickets-section">
+          <div className="section-title-row">
+            <div>
+              <p className="section-eyebrow">Biletlerim</p>
+              <h2 className="section-title">Sahip Olduğun Biletler</h2>
+            </div>
+            {canBuyTickets && !soldOut && userTickets.length > 0 && (
+              <button onClick={handleBuyTicket} className="btn-add">
+                + Bilet Ekle
+              </button>
+            )}
+          </div>
+
+          {userTicketsLoading ? (
+            <div className="tickets-grid">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="skeleton ticket-skeleton" />
               ))}
             </div>
+          ) : userTickets.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🎫</div>
+              <h3 className="empty-title">Henüz Biletiniz Yok</h3>
+              <p className="empty-text">
+                Çekilişe katılmak için bilet satın alın ve şansınızı deneyin!
+              </p>
+              {canBuyTickets && !soldOut && (
+                <button onClick={handleBuyTicket} className="btn-primary-large">
+                  İlk Biletini Al
+                </button>
+              )}
+            </div>
           ) : (
-            <div className="metrics-grid">
-              <div className="metric-card">
-                <span className="metric-label">Satılan</span>
-                <div className="metric-value">{lotteryStats.sold}</div>
-              </div>
-              <div className="metric-card">
-                <span className="metric-label">Kalan</span>
-                <div className="metric-value">{lotteryStats.available}</div>
-              </div>
-              <div className="metric-card">
-                <span className="metric-label">Talep</span>
-                <div className="metric-value">{lotteryStats.pending}</div>
-              </div>
-              <div className="metric-card">
-                <span className="metric-label">Toplam Bilet</span>
-                <div className="metric-value">{selectedLottery.maxTickets}</div>
-              </div>
+            <div className="tickets-grid">
+              {userTickets.map(ticket => (
+                <Ticket key={ticket.id} ticket={ticket} showStatus={true} />
+              ))}
             </div>
           )}
         </div>
-      </section>
-
-      <div className="tickets-section">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Biletlerin</p>
-            <h2>Biletlerim</h2>
-          </div>
-          {canBuyTickets && !soldOut && (
-            <button onClick={handleBuyTicket} className="buy-button">
-              {userTickets.length === 0 ? '+ Bilet Al' : '+ Daha Fazla Bilet Al'}
-            </button>
-          )}
-        </div>
-
-        {userTicketsLoading ? (
-          <div className="tickets-grid">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="skeleton ticket-skeleton" />
-            ))}
-          </div>
-        ) : userTickets.length === 0 ? (
-          <div className="empty-tickets">
-            <div className="empty-icon">🎫</div>
-            <p>Henüz biletiniz yok</p>
-            {canBuyTickets && !soldOut && (
-              <button onClick={handleBuyTicket} className="buy-button-large">
-                İlk Biletini Al
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="tickets-grid">
-            {userTickets.map(ticket => (
-              <Ticket key={ticket.id} ticket={ticket} />
-            ))}
-          </div>
-        )}
       </div>
 
-      {timeLeft === 'Çekiliş başladı!' && (
-        <div className="lottery-live-banner">
-          <button onClick={handleGoToLottery} className="join-lottery-button">
-            🎉 Canlı Çekilişe Katıl
+      {/* Rules Modal */}
+      {showRulesModal && (
+        <div className="modal-overlay" onClick={() => setShowRulesModal(false)}>
+          <div className="modal-content rules-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Çekiliş Kuralları</h2>
+              <button className="modal-close" onClick={() => setShowRulesModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {selectedLottery.rules ? (
+                <div className="rules-content">
+                  {selectedLottery.rules.split('\n').map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-rules">Kurallar henüz tanımlanmamış.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live/Results Banner */}
+      {lotterySession && lotterySession.status === 'completed' && (
+        <div className="live-banner">
+          <button onClick={handleGoToLottery} className="results-banner-btn">
+            🏆 SONUÇLAR AÇIKLANDI - GÖRÜNTÜLE
+          </button>
+        </div>
+      )}
+      {lotterySession && lotterySession.status === 'active' && (
+        <div className="live-banner">
+          <button onClick={handleGoToLottery} className="live-banner-btn">
+            🔴 CANLI YAYIN - ŞİMDİ İZLE
           </button>
         </div>
       )}

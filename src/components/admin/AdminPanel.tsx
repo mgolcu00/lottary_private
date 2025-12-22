@@ -4,6 +4,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { LotterySettings, TicketRequest, Ticket, User } from '../../types';
 import { toDateSafe } from '../../utils/date';
+import { DEFAULT_LOTTERY_RULES, DEFAULT_DISCLAIMER_TEXT } from '../../utils/defaultRules';
 import './AdminPanel.css';
 
 type TabType = 'dashboard' | 'requests' | 'users' | 'tickets' | 'settings';
@@ -225,7 +226,8 @@ export function AdminPanel() {
         salesOpen: true,
         numberRange,
         status: 'scheduled',
-        rules: 'Çekiliş kurallarını buradan güncelleyin.',
+        rules: DEFAULT_LOTTERY_RULES,
+        disclaimerText: DEFAULT_DISCLAIMER_TEXT,
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -240,7 +242,7 @@ export function AdminPanel() {
         lotteryName: ''
       };
       setFormData(resetForm);
-      setRulesDraft('Çekiliş kurallarını buradan güncelleyin.');
+      setRulesDraft(DEFAULT_LOTTERY_RULES);
       alert('Çekiliş başarıyla oluşturuldu!');
     } catch (error) {
       console.error('Error creating lottery:', error);
@@ -256,6 +258,8 @@ export function AdminPanel() {
 
       await updateDoc(doc(db, 'tickets', request.ticketId), {
         status: 'confirmed',
+        userId: request.userId,
+        userName: request.userName,
         confirmedAt: new Date()
       });
 

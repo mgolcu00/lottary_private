@@ -4,12 +4,13 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings, LotterySession as LotterySessionType } from '../../types';
 import { Ticket } from '../common/Ticket';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toDateSafe } from '../../utils/date';
 import './LotterySession.css';
 
 export function LotterySession() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const lotteryId = searchParams.get('lotteryId');
 
@@ -30,6 +31,7 @@ export function LotterySession() {
   const [stage, setStage] = useState<'amorti1' | 'amorti2' | 'grand' | 'completed'>('grand');
   const [amortiFirst, setAmortiFirst] = useState<number | null>(null);
   const [amortiSecond, setAmortiSecond] = useState<number | null>(null);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Presence tracking
   useEffect(() => {
@@ -284,31 +286,57 @@ export function LotterySession() {
     }
   };
 
-  const drawNumber = async () => {
+  const drawNumber = async (maxAttempts = 5000) => {
     if (!user?.isAdmin || !session || session.status !== 'active' || stage !== 'grand') return;
     if (drawnNumbers.length >= 5 || pendingCandidate !== null) return;
 
     setIsDrawing(true);
     setInvalidNumber(null);
+    setCurrentNumber(null);
 
-    const candidate = Math.floor(Math.random() * 9) + 1;
-    const sequence = [...drawnNumbers, candidate];
-    const valid = hasMatchingPrefix(sequence);
+    // Uzun ve efektli animasyon başlat
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
+    // Akıllı algoritma: Her pozisyon için mutlaka eşleşen bir sayı bul
+    // 1. numara için: En az 1 bilettte 1. pozisyonda bu sayı olmalı
+    // 2. numara için: En az 1 bilettte 1. ve 2. pozisyonlar eşleşmeli
+    // 3-5. numara için: Aynı mantık devam eder
+    let attempts = 0;
+    let candidate = 0;
+    let valid = false;
+
+    while (attempts < maxAttempts && !valid) {
+      candidate = Math.floor(Math.random() * 9) + 1;
+      const sequence = [...drawnNumbers, candidate];
+      valid = hasMatchingPrefix(sequence);
+      attempts++;
+
+      // Eğer valid değilse, arka planda hızlıca tekrar dene
+      if (!valid && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+
+    // Eğer maxAttempts'e rağmen bulunamadıysa (çok nadir),
+    // rastgele bir sayı kabul et (çekiliş tıkanmasın)
+    if (!valid) {
+      console.warn(`Could not find valid number after ${maxAttempts} attempts`);
+      candidate = Math.floor(Math.random() * 9) + 1;
+    }
+
+    // Valid sayıyı göster
     await updateDoc(doc(db, 'lotterySessions', session.id), {
-      currentPhase: valid ? 'reveal' : 'invalid',
+      currentPhase: 'reveal',
       currentNumber: candidate,
-      lastInvalidNumber: valid ? null : candidate,
+      lastInvalidNumber: null,
       drawnNumbers
     });
 
-    if (valid) {
-      await acceptNumber(session.id, candidate, drawnNumbers);
-    } else {
-      setPendingCandidate(candidate);
-      setInvalidNumber(candidate);
-      setIsDrawing(false);
-    }
+    await acceptNumber(session.id, candidate, drawnNumbers);
+
+    // Numarayı gösterdikten sonra kısa bir süre bekle
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setIsDrawing(false);
   };
 
   const retryDraw = () => {
@@ -324,18 +352,38 @@ export function LotterySession() {
 
   const drawAmortiFirst = async () => {
     if (!user?.isAdmin || !session || stage !== 'amorti1') return;
+
+    setIsDrawing(true);
+    setCurrentNumber(null);
+
+    // Uzun animasyon - 2.5 saniye
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
     const candidate = Math.floor(Math.random() * 5) + 1; // 1-5
     setAmortiFirst(candidate);
+    setCurrentNumber(candidate);
+
     await updateDoc(doc(db, 'lotterySessions', session.id), {
       amortiFirstNumber: candidate,
       stage: 'amorti2',
       currentPhase: 'reveal',
       currentNumber: candidate
     });
+
+    // Numarayı gösterdikten sonra kısa bir süre bekle
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsDrawing(false);
   };
 
   const drawAmortiSecond = async () => {
     if (!user?.isAdmin || !session || stage !== 'amorti2') return;
+
+    setIsDrawing(true);
+    setCurrentNumber(null);
+
+    // Uzun animasyon - 2.5 saniye
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
     let candidate = Math.floor(Math.random() * 5) + 5; // 5-9
     if (amortiFirst !== null) {
       let attempts = 0;
@@ -345,12 +393,23 @@ export function LotterySession() {
       }
     }
     setAmortiSecond(candidate);
+    setCurrentNumber(candidate);
+
+    // Amorti çekildikten sonra büyük ödül için çekilişi SIFIRLA
     await updateDoc(doc(db, 'lotterySessions', session.id), {
       amortiSecondNumber: candidate,
       stage: 'grand',
-      currentPhase: 'reveal',
-      currentNumber: candidate
+      currentPhase: 'drawing',
+      currentNumber: null,
+      drawnNumbers: [], // SIFIRLA - büyük ödül için baştan başla
+      lastInvalidNumber: null
     });
+
+    // Numarayı gösterdikten sonra kısa bir süre bekle
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setDrawnNumbers([]); // Local state'i de sıfırla
+    setCurrentNumber(null);
+    setIsDrawing(false);
   };
 
   const findWinners = (drawnNumbers: number[]): TicketType[] => {
@@ -382,6 +441,11 @@ export function LotterySession() {
       }
     }
     return Array.from({ length: matchCount }, (_, i) => i);
+  };
+
+  const isAmortiWinner = (ticket: TicketType) => {
+    if (amortiFirst === null || amortiSecond === null) return false;
+    return ticket.numbers.includes(amortiFirst) && ticket.numbers.includes(amortiSecond);
   };
 
   const finishSession = async () => {
@@ -529,83 +593,98 @@ export function LotterySession() {
 
   if (session.status === 'completed') {
     return (
-      <div className="lottery-session">
+      <div className="lottery-session results-screen">
         {showConfetti && (
           <div className="confetti-container">
-            {Array.from({ length: 50 }).map((_, i) => (
+            {Array.from({ length: 80 }).map((_, i) => (
               <div
                 key={i}
                 className="confetti"
                 style={{
                   left: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 2}s`,
-                  backgroundColor: ['#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b'][Math.floor(Math.random() * 5)]
+                  animationDelay: `${Math.random() * 3}s`,
+                  backgroundColor: ['#10b981', '#059669', '#fbbf24', '#f59e0b', '#dc2626'][Math.floor(Math.random() * 5)]
                 }}
               />
             ))}
           </div>
         )}
 
-        <div className="result-header">
-          <div>
-            <p className="session-subtitle">{lottery.lotteryName || 'Çekiliş'}</p>
-            <h1 className="session-title">Çekiliş Sonuçları</h1>
-            <p className="session-date">📅 {new Date(lottery.eventDate).toLocaleString('tr-TR')}</p>
-          </div>
-          <div className="result-pot">
-            <span>Toplam Pot</span>
-            <strong>{potValue.toLocaleString('tr-TR')} TL</strong>
-          </div>
-        </div>
-
-        <div className="result-grid">
-          <div className="result-card">
-            <h2>🏆 Büyük Ödül</h2>
-            {grandWinners.length === 0 ? (
-              <p>Bu çekilişte kazanan bulunamadı.</p>
-            ) : (
-              <div className="winner-list">
-                {grandWinners.map(t => (
-                  <div key={t.id} className="winner-row">
-                    <div className="winner-info">
-                      <span className="winner-name">{t.userName || 'İsimsiz'}</span>
-                      <span className="winner-ticket">Bilet #{t.ticketNumber.toString().padStart(6, '0')}</span>
-                    </div>
-                    <span className="winner-amount">{remainingPot.toLocaleString('tr-TR')} TL</span>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="results-container">
+          <div className="results-header">
+            <h1 className="results-title">🎄 Çekiliş Sonuçları 🎄</h1>
+            <p className="results-subtitle">{lottery.lotteryName || 'Çekiliş'}</p>
+            <p className="results-date">📅 {new Date(lottery.eventDate).toLocaleString('tr-TR')}</p>
           </div>
 
-          <div className="result-card">
-            <h2>🎗️ Amorti Kazananlar</h2>
-            <div className="amorti-summary">
-              <div>Amorti #1: {amortiFirst ?? '–'}</div>
-              <div>Amorti #2: {amortiSecond ?? '–'}</div>
+          {/* Büyük Ödül Kazananı */}
+          <div className="grand-prize-section">
+            <div className="section-title">
+              <span className="title-icon">🏆</span>
+              <h2>BÜYÜK ÖDÜL KAZANANı</h2>
+              <span className="title-icon">🏆</span>
             </div>
-            {amortiWinners.length === 0 ? (
-              <p>Amorti kazanan yok.</p>
+
+            {grandWinners.length === 0 ? (
+              <div className="no-winner-card">
+                <p className="no-winner-text">Bu çekilişte büyük ödülü kazanan olmadı</p>
+                <p className="no-winner-subtext">Pot bir sonraki çekilişe devredildi</p>
+              </div>
             ) : (
-              <div className="winner-list">
-                {amortiWinners.map(t => (
-                  <div key={t.id} className="winner-row">
-                    <div className="winner-info">
-                      <span className="winner-name">{t.userName || 'İsimsiz'}</span>
-                      <span className="winner-ticket">Bilet #{t.ticketNumber.toString().padStart(6, '0')}</span>
+              <div className="grand-winner-container">
+                {/* Bilet Gösterimi - En üstte */}
+                <div className="grand-winner-ticket">
+                  {grandWinners.map(t => (
+                    <Ticket key={t.id} ticket={t} isGrandWinner={true} showStatus={false} />
+                  ))}
+                </div>
+
+                {/* Kazanan Bilgisi - Sol altta badge */}
+                <div className="grand-winner-info">
+                  {grandWinners.map(t => (
+                    <div key={t.id} className="winner-badge">
+                      <div className="badge-content">
+                        <span className="badge-label">Kazanan</span>
+                        <span className="badge-name">{t.userName || 'İsimsiz'}</span>
+                        <span className="badge-amount">{remainingPot.toLocaleString('tr-TR')} TL</span>
+                      </div>
                     </div>
-                    <span className="winner-amount">{(lottery.ticketPrice || 0).toLocaleString('tr-TR')} TL</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        </div>
 
-        <div className="result-actions">
-          <button className="primary-button" onClick={() => window.location.reload()}>
-            Yeni Çekilişleri Gör
-          </button>
+          {/* Amorti Kazananları */}
+          {amortiWinners.length > 0 && (
+            <div className="amorti-section">
+              <div className="section-title amorti-title">
+                <span className="title-icon">🎗️</span>
+                <h2>AMORTİ KAZANANLAR</h2>
+                <span className="title-icon">🎗️</span>
+              </div>
+
+              <div className="amorti-numbers">
+                <div className="amorti-number-badge">Amorti #1: <strong>{amortiFirst ?? '–'}</strong></div>
+                <div className="amorti-number-badge">Amorti #2: <strong>{amortiSecond ?? '–'}</strong></div>
+              </div>
+
+              <div className="amorti-winners-grid">
+                {amortiWinners.map(t => (
+                  <div key={t.id} className="amorti-winner-card">
+                    <Ticket ticket={t} isAmortiWinner={true} showStatus={false} />
+                    <div className="amorti-winner-prize">{(lottery.ticketPrice || 0).toLocaleString('tr-TR')} TL</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="results-footer">
+            <button className="results-home-button" onClick={() => navigate('/')}>
+              <span>🏠</span> Anasayfaya Dön
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -661,56 +740,111 @@ export function LotterySession() {
           </div>
         </div>
 
-          <div className="roller-area">
-            <div className={`roller ${isDrawing ? 'spinning' : ''}`}>
-              <div className="roller-inner">
-                <div className="roller-number">
-                  {stage === 'amorti1' && amortiFirst !== null ? amortiFirst : null}
-                  {stage === 'amorti2' && amortiSecond !== null ? amortiSecond : null}
-                  {stage === 'grand' || stage === 'completed' ? (currentNumber ?? '•') : null}
-                  {stage === 'amorti1' && amortiFirst === null && '•'}
-                  {stage === 'amorti2' && amortiSecond === null && '•'}
-                </div>
-                <div className="roller-glow" />
-              </div>
-              <div className="roller-shadow" />
-            </div>
-            <div className="roller-status">
-              {stage === 'completed' ? (
-                <span className="status-pill success">Çekiliş tamamlandı</span>
-              ) : stage === 'amorti1' ? (
-                <span className="status-pill info">
-                  Amorti #1 (1-5) {amortiFirst !== null ? `: ${amortiFirst}` : 'çekiliyor'}
-                </span>
-              ) : stage === 'amorti2' ? (
-                <span className="status-pill info">
-                  Amorti #2 (5-9) {amortiSecond !== null ? `: ${amortiSecond}` : 'çekiliyor'}
-                </span>
-              ) : session.currentPhase === 'invalid' && isAdmin ? (
-                <span className="status-pill danger">
-                  Geçersiz numara: {invalidNumber ?? '-'} (prefix eşleşmedi)
-                </span>
-              ) : session.currentPhase === 'drawing' ? (
-                <span className="status-pill info">Numara karıştırılıyor...</span>
-              ) : (
-                <span className="status-pill info">
-                  Çekilen numara: {session.currentPhase === 'invalid' ? 'Hazırlanıyor' : (currentNumber ?? 'Hazırlanıyor')}
-                </span>
-              )}
-            </div>
+          {/* Stage Indicator */}
+          <div className="stage-indicator">
+            {stage === 'completed' ? (
+              <span className="stage-badge stage-completed">✓ Çekiliş Tamamlandı</span>
+            ) : stage === 'amorti1' ? (
+              <span className="stage-badge stage-amorti">Amorti #1 Çekiliyor (1-5)</span>
+            ) : stage === 'amorti2' ? (
+              <span className="stage-badge stage-amorti">Amorti #2 Çekiliyor (5-9)</span>
+            ) : (
+              <span className="stage-badge stage-grand">Büyük Ödül Çekilişi</span>
+            )}
           </div>
 
-          <div className="slots-row">
-            {Array.from({ length: 5 }).map((_, idx) => {
-              const value = drawnNumbers[idx];
-              const isActive = drawnNumbers.length === idx + 1 && session.currentPhase === 'reveal';
-              return (
-                <div key={idx} className={`number-slot ${value !== undefined ? 'filled' : ''} ${isActive ? 'active' : ''}`}>
-                  <div className="slot-index">{idx + 1}</div>
-                  <div className="slot-value">{value !== undefined ? value : '•'}</div>
+          {/* Tüp Sistemi */}
+          {(stage === 'amorti1' || stage === 'amorti2') ? (
+            /* Amorti: İki büyük tüp yan yana */
+            <div className="tubes-container amorti-tube-container">
+              {/* Amorti #1 */}
+              <div className="tube-wrapper amorti-tube-wrapper">
+                <div className="tube-label-amorti">Amorti #1 (1-5)</div>
+                <div className={`tube tube-large ${isDrawing && stage === 'amorti1' ? 'tube-spinning' : ''} ${amortiFirst ? 'tube-filled' : ''}`}>
+                  <div className="tube-body">
+                    <div className="tube-inner">
+                      <div className="tube-ball">
+                        {isDrawing && stage === 'amorti1' ? (
+                          <div className="ball-spinning">?</div>
+                        ) : amortiFirst ? (
+                          <div className="ball-number">{amortiFirst}</div>
+                        ) : (
+                          <div className="ball-empty">•</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="tube-shine" />
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Amorti #2 */}
+              <div className="tube-wrapper amorti-tube-wrapper">
+                <div className="tube-label-amorti">Amorti #2 (5-9)</div>
+                <div className={`tube tube-large ${isDrawing && stage === 'amorti2' ? 'tube-spinning' : ''} ${amortiSecond ? 'tube-filled' : ''}`}>
+                  <div className="tube-body">
+                    <div className="tube-inner">
+                      <div className="tube-ball">
+                        {isDrawing && stage === 'amorti2' ? (
+                          <div className="ball-spinning">?</div>
+                        ) : amortiSecond ? (
+                          <div className="ball-number">{amortiSecond}</div>
+                        ) : (
+                          <div className="ball-empty">•</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="tube-shine" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Büyük Ödül: 5 Tüp */
+            <div className="tubes-container">
+              {Array.from({ length: 5 }).map((_, idx) => {
+                const value = drawnNumbers[idx];
+                const isCurrentlyDrawing = isDrawing && drawnNumbers.length === idx;
+                const isFilled = value !== undefined;
+
+                return (
+                  <div key={idx} className="tube-wrapper">
+                    <div className="tube-label">#{idx + 1}</div>
+                    <div className={`tube ${isCurrentlyDrawing ? 'tube-spinning' : ''} ${isFilled ? 'tube-filled' : ''}`}>
+                      <div className="tube-body">
+                        <div className="tube-inner">
+                          <div className="tube-ball">
+                            {isCurrentlyDrawing ? (
+                              <div className="ball-spinning">?</div>
+                            ) : isFilled ? (
+                              <div className="ball-number">{value}</div>
+                            ) : (
+                              <div className="ball-empty">•</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="tube-shine" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Drawing Status */}
+          <div className="drawing-status">
+            {isDrawing ? (
+              <span className="status-message status-drawing">🎲 Numara çekiliyor...</span>
+            ) : stage === 'completed' ? (
+              <span className="status-message status-success">🎉 Çekiliş tamamlandı!</span>
+            ) : drawnNumbers.length === 5 ? (
+              <span className="status-message status-success">✓ Tüm sayılar çekildi</span>
+            ) : (
+              <span className="status-message status-info">
+                {drawnNumbers.length}/5 sayı çekildi
+              </span>
+            )}
           </div>
 
           <div className="drawn-preview">
@@ -837,13 +971,42 @@ export function LotterySession() {
             <p className="user-tickets-hint">Soldan sağa sırayla eşleşen rakamlar ışık yanar.</p>
           </div>
           <div className="tickets-grid">
-            {userTickets.map(ticket => (
-              <Ticket
-                key={ticket.id}
-                ticket={ticket}
-                highlightedIndices={getHighlightIndices(ticket)}
-              />
-            ))}
+            {userTickets.map(ticket => {
+              const isAmortiWin = isAmortiWinner(ticket);
+              const isGrandWin = session?.winnerTicketIds?.includes(ticket.id) || false;
+              return (
+                <Ticket
+                  key={ticket.id}
+                  ticket={ticket}
+                  highlightedIndices={getHighlightIndices(ticket)}
+                  isAmortiWinner={isAmortiWin}
+                  isGrandWinner={isGrandWin}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Rules Modal */}
+      {showRulesModal && lottery && (
+        <div className="modal-overlay" onClick={() => setShowRulesModal(false)}>
+          <div className="modal-content rules-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Çekiliş Kuralları</h2>
+              <button className="modal-close" onClick={() => setShowRulesModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {lottery.rules ? (
+                <div className="rules-content">
+                  {lottery.rules.split('\n').map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-rules">Kurallar henüz tanımlanmamış.</p>
+              )}
+            </div>
           </div>
         </div>
       )}

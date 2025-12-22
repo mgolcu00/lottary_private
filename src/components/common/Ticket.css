@@ -201,6 +201,54 @@
   color: #5a1a0d;
 }
 
+.badge-amorti-winner {
+  background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+  color: white;
+  animation: pulse-badge 2s infinite;
+  font-size: 11px;
+  padding: 6px 12px;
+}
+
+.badge-grand-winner {
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  color: #1a1a1a;
+  animation: pulse-badge 2s infinite;
+  font-size: 12px;
+  padding: 8px 14px;
+  font-weight: 900;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.ticket-container.amorti-winner-ticket {
+  box-shadow: 0 0 20px rgba(108, 92, 231, 0.5);
+  border-radius: 12px;
+}
+
+.ticket-container.grand-winner-ticket {
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.7);
+  border-radius: 12px;
+  animation: winner-glow 2s infinite;
+}
+
+@keyframes winner-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.9);
+  }
+}
+
 .ticket-owner-info {
   display: flex;
   align-items: center;
