@@ -268,6 +268,17 @@ Uygulama tüm ekran boyutlarında çalışır:
 
 ## 🚀 Deploy
 
+### ⚠️ SPA Routing Desteği
+
+Bu uygulama **Single Page Application (SPA)** olarak çalışır. Statik hosting platformlarında
+direkt URL'lere (örn: `/admin`, `/lottery`) erişim sağlamak için yönlendirme (rewrite) kuralları gereklidir.
+
+**Dahil Edilen Dosyalar:**
+- `render.yaml` - Render.com için otomatik konfigürasyon
+- `public/_redirects` - Netlify/Render static site için yönlendirme kuralları
+
+Tüm route'lar otomatik olarak `/index.html`'e yönlendirilir ve React Router client-side routing yapar.
+
 ### Vercel
 
 1. Vercel hesabınıza giriş yapın
@@ -275,11 +286,30 @@ Uygulama tüm ekran boyutlarında çalışır:
 3. Environment variables ekleyin
 4. Deploy!
 
-### Render
+### Render (Static Site)
 
-1. `package.json` içinde `engines` belirtin
-2. Build command: `npm run build`
-3. Start command: `npm run preview`
+**Otomatik Deploy (Önerilen):**
+1. GitHub repo'nuzu Render'a bağlayın
+2. `render.yaml` dosyası otomatik algılanacak
+3. Environment variables ekleyin (Firebase config)
+4. Deploy!
+
+**Manuel Ayarlar:**
+1. **Type**: Static Site
+2. **Build Command**: `npm install && npm run build`
+3. **Publish Directory**: `dist`
+4. Environment variables ekleyin
+
+**ÖNEMLİ**: Proje `render.yaml` ve `public/_redirects` dosyalarını içerir.
+Bu dosyalar SPA routing için gereklidir (tüm route'lar `/index.html`'e yönlendirilir).
+
+### Netlify
+
+1. Netlify'a GitHub repo'nuzu bağlayın
+2. **Build Command**: `npm run build`
+3. **Publish Directory**: `dist`
+4. Environment variables ekleyin
+5. `public/_redirects` dosyası otomatik algılanır ✅
 
 ## 🤝 Katkıda Bulunma
 
