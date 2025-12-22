@@ -5,6 +5,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings } from '../../types';
 import { Ticket } from '../common/Ticket';
+import { toDateSafe } from '../../utils/date';
 import './BuyTicket.css';
 
 export function BuyTicket() {
@@ -33,9 +34,10 @@ export function BuyTicket() {
         setLottery({
           ...lotteryData,
           id: lotteryDoc.id,
-          eventDate: lotteryData.eventDate.toDate ? lotteryData.eventDate.toDate() : new Date(lotteryData.eventDate),
-          createdAt: lotteryData.createdAt.toDate ? lotteryData.createdAt.toDate() : new Date(lotteryData.createdAt),
-          updatedAt: lotteryData.updatedAt.toDate ? lotteryData.updatedAt.toDate() : new Date(lotteryData.updatedAt)
+          eventDate: toDateSafe(lotteryData.eventDate),
+          createdAt: toDateSafe(lotteryData.createdAt),
+          updatedAt: toDateSafe(lotteryData.updatedAt),
+          salesOpen: lotteryData.salesOpen ?? true
         } as LotterySettings);
       } else {
         navigate('/');
@@ -67,6 +69,10 @@ export function BuyTicket() {
   }, [lottery]);
 
   const handleTicketSelect = (ticket: TicketType) => {
+    if (lottery && lottery.salesOpen === false) {
+      alert('Satışlar kapalı.');
+      return;
+    }
     setSelectedTicket(ticket);
     setShowRequestModal(true);
   };
@@ -121,6 +127,12 @@ export function BuyTicket() {
             💰 {lottery.ticketPrice} TL
           </div>
         </div>
+
+        {lottery.salesOpen === false && (
+          <div className="sales-closed-banner">
+            ⚠️ Satışlar kapalı. Admin tekrar açana kadar bilet seçemezsin.
+          </div>
+        )}
 
         <div className="available-tickets-section">
           <h2>

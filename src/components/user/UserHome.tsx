@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings } from '../../types';
 import { Ticket } from '../common/Ticket';
 import { LotterySelector } from './LotterySelector';
+import { toDateSafe } from '../../utils/date';
 import './UserHome.css';
 
 export function UserHome() {
@@ -30,8 +31,8 @@ export function UserHome() {
       const tickets = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
-        requestedAt: doc.data().requestedAt?.toDate?.(),
-        confirmedAt: doc.data().confirmedAt?.toDate?.()
+        requestedAt: doc.data().requestedAt ? toDateSafe(doc.data().requestedAt) : undefined,
+        confirmedAt: doc.data().confirmedAt ? toDateSafe(doc.data().confirmedAt) : undefined
       } as TicketType));
       setUserTickets(tickets);
     });

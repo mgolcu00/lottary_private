@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, writeBatc
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { LotterySettings, TicketRequest, Ticket, User } from '../../types';
+import { toDateSafe } from '../../utils/date';
 import './AdminPanel.css';
 
 type TabType = 'dashboard' | 'requests' | 'users' | 'tickets' | 'settings';
@@ -19,6 +20,7 @@ export function AdminPanel() {
   const [requestSearch, setRequestSearch] = useState('');
   const [requestStatus, setRequestStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [requestUser, setRequestUser] = useState<'all' | string>('all');
+  const [rulesDraft, setRulesDraft] = useState('');
   const [formData, setFormData] = useState({
     eventDate: '',
     ticketPrice: 50,
@@ -46,9 +48,11 @@ export function AdminPanel() {
         return {
           ...data,
           id: doc.id,
-          eventDate: data.eventDate.toDate ? data.eventDate.toDate() : new Date(data.eventDate),
-          createdAt: data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-          updatedAt: data.updatedAt.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt)
+          eventDate: toDateSafe(data.eventDate),
+          createdAt: toDateSafe(data.createdAt),
+          updatedAt: toDateSafe(data.updatedAt),
+          salesOpen: data.salesOpen ?? true,
+          status: data.status ?? (data.isActive ? 'active' : 'scheduled')
         } as LotterySettings;
       }).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
@@ -58,7 +62,9 @@ export function AdminPanel() {
       if (lotteries.length > 0 && !lottery) {
         // Aktif bir çekiliş varsa onu seç, yoksa en yeniyi seç
         const activeLottery = lotteries.find(l => l.isActive);
-        setLottery(activeLottery || lotteries[0]);
+        const next = activeLottery || lotteries[0];
+        setLottery(next);
+        setRulesDraft(next.rules || '');
       } else if (lotteries.length === 0) {
         setLottery(null);
         setShowCreateForm(true);
@@ -70,6 +76,7 @@ export function AdminPanel() {
 
   useEffect(() => {
     if (!lottery) return;
+    setRulesDraft(lottery.rules || '');
 
     const requestsQuery = query(
       collection(db, 'ticketRequests'),
@@ -80,7 +87,7 @@ export function AdminPanel() {
       const requests = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
-        createdAt: doc.data().createdAt.toDate ? doc.data().createdAt.toDate() : new Date(doc.data().createdAt)
+        createdAt: toDateSafe(doc.data().createdAt)
       } as TicketRequest));
       setTicketRequests(requests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
     });
@@ -168,12 +175,12 @@ export function AdminPanel() {
     const generatedCombinations = new Set<string>();
 
     for (let i = 1; i <= maxTickets; i++) {
-      // Generate unique 5-digit number combination (0-9 each digit)
+      // Generate unique 5-digit number combination (digits 1-9)
       let numbers: number[];
       let combination: string;
 
       do {
-        numbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * 10));
+        numbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * 9) + 1);
         combination = numbers.join('');
       } while (generatedCombinations.has(combination));
 
@@ -205,6 +212,7 @@ export function AdminPanel() {
         ticketPrice: formData.ticketPrice,
         maxTickets: formData.maxTickets,
         isActive: true,
+        rules: 'Çekiliş kurallarını buradan güncelleyin.',
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -212,12 +220,14 @@ export function AdminPanel() {
       await generateTickets(lotteryRef.id, formData.maxTickets);
 
       setShowCreateForm(false);
-      setFormData({
+      const resetForm = {
         eventDate: '',
         ticketPrice: 50,
         maxTickets: 1000,
         lotteryName: ''
-      });
+      };
+      setFormData(resetForm);
+      setRulesDraft('Çekiliş kurallarını buradan güncelleyin.');
       alert('Çekiliş başarıyla oluşturuldu!');
     } catch (error) {
       console.error('Error creating lottery:', error);
@@ -275,6 +285,83 @@ export function AdminPanel() {
     } catch (error) {
       console.error('Error updating user:', error);
       alert('Kullanıcı güncellenemedi.');
+    }
+  };
+
+  const handleSaveRules = async () => {
+    if (!lottery) return;
+    try {
+      await updateDoc(doc(db, 'lotteries', lottery.id), {
+        rules: rulesDraft,
+        updatedAt: new Date()
+      });
+      alert('Kurallar güncellendi.');
+    } catch (error) {
+      console.error('Error updating rules:', error);
+      alert('Kurallar kaydedilemedi.');
+    }
+  };
+
+  const toggleSales = async () => {
+    if (!lottery) return;
+    try {
+      await updateDoc(doc(db, 'lotteries', lottery.id), {
+        salesOpen: !(lottery.salesOpen ?? true),
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error toggling sales:', error);
+      alert('Satış durumu güncellenemedi.');
+    }
+  };
+
+  const startNow = async () => {
+    if (!lottery) return;
+    try {
+      await updateDoc(doc(db, 'lotteries', lottery.id), {
+        eventDate: new Date(),
+        status: 'active',
+        isActive: true,
+        updatedAt: new Date()
+      });
+      alert('Çekiliş tarihi şimdi olarak güncellendi.');
+    } catch (error) {
+      console.error('Error starting now:', error);
+      alert('Çekiliş başlatılamadı.');
+    }
+  };
+
+  const endLottery = async () => {
+    if (!lottery) return;
+    if (!confirm('Çekilişi sonlandırmak istediğine emin misin?')) return;
+    try {
+      await updateDoc(doc(db, 'lotteries', lottery.id), {
+        status: 'completed',
+        isActive: false,
+        salesOpen: false,
+        updatedAt: new Date()
+      });
+      alert('Çekiliş sonlandırıldı.');
+    } catch (error) {
+      console.error('Error ending lottery:', error);
+      alert('Çekiliş sonlandırılamadı.');
+    }
+  };
+
+  const deactivateLottery = async () => {
+    if (!lottery) return;
+    if (!confirm('Çekilişi pasif hale getirmek istediğine emin misin?')) return;
+    try {
+      await updateDoc(doc(db, 'lotteries', lottery.id), {
+        isActive: false,
+        salesOpen: false,
+        status: 'cancelled',
+        updatedAt: new Date()
+      });
+      alert('Çekiliş pasif yapıldı.');
+    } catch (error) {
+      console.error('Error deactivating lottery:', error);
+      alert('Çekiliş pasif yapılamadı.');
     }
   };
 
@@ -695,6 +782,22 @@ export function AdminPanel() {
         {activeTab === 'settings' && (
           <div className="settings-tab">
             <h2>Çekiliş Ayarları</h2>
+            <div className="settings-card controls">
+              <div className="setting-actions">
+                <button className={`chip-button ${lottery.salesOpen ?? true ? 'active' : ''}`} onClick={toggleSales}>
+                  {(lottery.salesOpen ?? true) ? 'Satışı Kapat' : 'Satışı Aç'}
+                </button>
+                <button className="chip-button" onClick={startNow}>
+                  Çekilişi Şimdi Başlat
+                </button>
+                <button className="chip-button" onClick={endLottery}>
+                  Çekilişi Sonlandır
+                </button>
+                <button className="chip-button danger" onClick={deactivateLottery}>
+                  Çekilişi Pasif Yap
+                </button>
+              </div>
+            </div>
             <div className="settings-card">
               <div className="setting-item">
                 <span className="setting-label">Çekiliş ID:</span>
@@ -726,6 +829,21 @@ export function AdminPanel() {
                   {new Date(lottery.createdAt).toLocaleString('tr-TR')}
                 </span>
               </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-header">
+                <div>
+                  <h3>Kurallar</h3>
+                  <p className="settings-description">Bu alan kullanıcıların göreceği şekilde yayınlanır.</p>
+                </div>
+                <button className="save-button" onClick={handleSaveRules}>Kaydet</button>
+              </div>
+              <textarea
+                className="rules-textarea"
+                value={rulesDraft}
+                onChange={(e) => setRulesDraft(e.target.value)}
+                placeholder="Örn: Çekiliş 5 haneli sayılarla oynanır, her bilet benzersizdir..."
+              />
             </div>
             <div className="danger-zone">
               <h3>⚠️ Tehlikeli Bölge</h3>

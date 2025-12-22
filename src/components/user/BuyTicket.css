@@ -136,6 +136,16 @@
   font-size: 18px;
 }
 
+.sales-closed-banner {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  color: #856404;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
 .confirmation-card {
   background: white;
   border-radius: 24px;

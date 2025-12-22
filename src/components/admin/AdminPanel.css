@@ -745,6 +745,98 @@
   margin-bottom: 24px;
 }
 
+.settings-card.controls {
+  background: white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.setting-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chip-button {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid #e9ecef;
+  background: #f8f9fa;
+  color: #333;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chip-button.active {
+  background: linear-gradient(135deg, #55efc4 0%, #00b894 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.chip-button.danger {
+  background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.chip-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.settings-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.settings-card-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.settings-description {
+  margin: 4px 0 0;
+  color: #666;
+  font-size: 13px;
+}
+
+.rules-textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid #ddd;
+  font-size: 14px;
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.rules-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.save-button {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+}
+
 .setting-item {
   display: flex;
   justify-content: space-between;

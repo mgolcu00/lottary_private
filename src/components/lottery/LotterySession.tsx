@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings, LotterySession as LotterySessionType } from '../../types';
 import { Ticket } from '../common/Ticket';
 import { useSearchParams } from 'react-router-dom';
+import { toDateSafe } from '../../utils/date';
 import './LotterySession.css';
 
 export function LotterySession() {
@@ -16,9 +17,12 @@ export function LotterySession() {
   const [session, setSession] = useState<LotterySessionType | null>(null);
   const [userTickets, setUserTickets] = useState<TicketType[]>([]);
   const [allTickets, setAllTickets] = useState<TicketType[]>([]);
+  const [availableCount, setAvailableCount] = useState(0);
   const [drawnNumbers, setDrawnNumbers] = useState<number[]>([]);
   const [currentNumber, setCurrentNumber] = useState<number | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [invalidNumber, setInvalidNumber] = useState<number | null>(null);
+  const [pendingCandidate, setPendingCandidate] = useState<number | null>(null);
   const [winner, setWinner] = useState<TicketType | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [viewersCount, setViewersCount] = useState(0);
@@ -109,9 +113,9 @@ export function LotterySession() {
         setLottery({
           ...lotteryData,
           id: snapshot.id,
-          eventDate: lotteryData.eventDate.toDate ? lotteryData.eventDate.toDate() : new Date(lotteryData.eventDate),
-          createdAt: lotteryData.createdAt.toDate ? lotteryData.createdAt.toDate() : new Date(lotteryData.createdAt),
-          updatedAt: lotteryData.updatedAt.toDate ? lotteryData.updatedAt.toDate() : new Date(lotteryData.updatedAt)
+          eventDate: toDateSafe(lotteryData.eventDate),
+          createdAt: toDateSafe(lotteryData.createdAt),
+          updatedAt: toDateSafe(lotteryData.updatedAt)
         } as LotterySettings);
       }
     });
@@ -129,16 +133,23 @@ export function LotterySession() {
 
     const unsubscribe = onSnapshot(sessionQuery, (snapshot) => {
       if (!snapshot.empty) {
-        const sessionData = snapshot.docs[0].data() as LotterySessionType;
-        setSession({
+        const sessionDoc = snapshot.docs[0];
+        const sessionData = sessionDoc.data() as LotterySessionType;
+        const normalizedSession = {
           ...sessionData,
-          id: snapshot.docs[0].id
-        } as LotterySessionType);
+          id: sessionDoc.id
+        } as LotterySessionType;
+        setSession(normalizedSession);
         setDrawnNumbers(sessionData.drawnNumbers || []);
-        setCurrentNumber(sessionData.currentNumber || null);
+        setCurrentNumber(sessionData.currentNumber ?? null);
+        setInvalidNumber(sessionData.lastInvalidNumber ?? null);
+        setIsDrawing(sessionData.currentPhase === 'drawing');
 
         if (sessionData.status === 'completed' && sessionData.winnerTicketIds.length > 0) {
           checkWinner(sessionData.winnerTicketIds);
+        } else {
+          setWinner(null);
+          setShowConfetti(false);
         }
       }
     });
@@ -172,8 +183,7 @@ export function LotterySession() {
 
     const ticketsQuery = query(
       collection(db, 'tickets'),
-      where('lotteryId', '==', lottery.id),
-      where('status', '==', 'confirmed')
+      where('lotteryId', '==', lottery.id)
     );
 
     const unsubscribe = onSnapshot(ticketsQuery, (snapshot) => {
@@ -182,6 +192,7 @@ export function LotterySession() {
         id: doc.id
       } as TicketType));
       setAllTickets(tickets);
+      setAvailableCount(tickets.filter(t => t.status === 'available').length);
     });
 
     return unsubscribe;
@@ -193,6 +204,9 @@ export function LotterySession() {
       setShowConfetti(true);
       const winnerTicket = userTickets.find(ticket => winnerTicketIds.includes(ticket.id));
       setWinner(winnerTicket || null);
+    } else {
+      setShowConfetti(false);
+      setWinner(null);
     }
   };
 
@@ -200,75 +214,135 @@ export function LotterySession() {
     if (!lottery || !user?.isAdmin) return;
 
     try {
-      const sessionRef = await addDoc(collection(db, 'lotterySessions'), {
+      await addDoc(collection(db, 'lotterySessions'), {
         lotteryId: lottery.id,
         status: 'active',
+        currentPhase: 'drawing',
+        lastInvalidNumber: null,
         drawnNumbers: [],
         winnerTicketIds: [],
         startedAt: new Date()
       });
-
-      simulateDrawing(sessionRef.id);
     } catch (error) {
       console.error('Error starting lottery:', error);
     }
   };
 
-  const simulateDrawing = async (sessionId: string) => {
-    const numbers = Array.from({ length: 10 }, (_, i) => i); // 0-9
-    const drawn: number[] = [];
+  const hasMatchingPrefix = (sequence: number[]) => {
+    const confirmedTickets = allTickets.filter(t => t.status === 'confirmed');
+    if (confirmedTickets.length === 0) return true;
+    return confirmedTickets.some(ticket =>
+      sequence.every((num, idx) => ticket.numbers[idx] === num)
+    );
+  };
 
-    for (let i = 0; i < 5; i++) {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      setIsDrawing(true);
-
-      const randomIndex = Math.floor(Math.random() * numbers.length);
-      const drawnNumber = numbers[randomIndex];
-      numbers.splice(randomIndex, 1);
-      drawn.push(drawnNumber);
-
-      await updateDoc(doc(db, 'lotterySessions', sessionId), {
-        currentNumber: drawnNumber,
-        drawnNumbers: drawn
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsDrawing(false);
-    }
-
-    // Kazananları bul
-    const winners = findWinners(drawn);
+  const acceptNumber = async (sessionId: string, candidate: number, currentDrawn: number[]) => {
+    const nextDrawn = [...currentDrawn, candidate];
+    setCurrentNumber(candidate);
+    setInvalidNumber(null);
+    setPendingCandidate(null);
 
     await updateDoc(doc(db, 'lotterySessions', sessionId), {
-      status: 'completed',
-      winnerTicketIds: winners.map(t => t.id),
-      completedAt: new Date(),
-      currentNumber: null
+      currentPhase: 'reveal',
+      currentNumber: candidate,
+      drawnNumbers: nextDrawn,
+      lastInvalidNumber: null
     });
+
+    if (nextDrawn.length === 5) {
+      const winners = findWinners(nextDrawn);
+      await updateDoc(doc(db, 'lotterySessions', sessionId), {
+        status: 'completed',
+        currentPhase: 'completed',
+        winnerTicketIds: winners.map(t => t.id),
+        completedAt: new Date(),
+        currentNumber: null,
+        lastInvalidNumber: null
+      });
+      setIsDrawing(false);
+    }
+  };
+
+  const drawNumber = async () => {
+    if (!user?.isAdmin || !session || session.status !== 'active') return;
+    if (drawnNumbers.length >= 5 || pendingCandidate !== null) return;
+
+    setIsDrawing(true);
+    setInvalidNumber(null);
+
+    const candidate = Math.floor(Math.random() * 9) + 1;
+    const sequence = [...drawnNumbers, candidate];
+    const valid = hasMatchingPrefix(sequence);
+
+    await updateDoc(doc(db, 'lotterySessions', session.id), {
+      currentPhase: valid ? 'reveal' : 'invalid',
+      currentNumber: candidate,
+      lastInvalidNumber: valid ? null : candidate,
+      drawnNumbers
+    });
+
+    if (valid) {
+      await acceptNumber(session.id, candidate, drawnNumbers);
+    } else {
+      setPendingCandidate(candidate);
+      setInvalidNumber(candidate);
+      setIsDrawing(false);
+    }
+  };
+
+  const retryDraw = () => {
+    setPendingCandidate(null);
+    setInvalidNumber(null);
+    drawNumber();
+  };
+
+  const acceptInvalid = () => {
+    if (!session || pendingCandidate === null) return;
+    acceptNumber(session.id, pendingCandidate, drawnNumbers);
   };
 
   const findWinners = (drawnNumbers: number[]): TicketType[] => {
     // Only consider confirmed tickets
     const confirmedTickets = allTickets.filter(t => t.status === 'confirmed');
-
     if (confirmedTickets.length === 0) return [];
 
-    const ticketsWithMatches = confirmedTickets.map(ticket => {
-      const matches = ticket.numbers.filter(num => drawnNumbers.includes(num)).length;
-      return { ticket, matches };
-    });
+    return confirmedTickets.filter(ticket =>
+      drawnNumbers.every((num, idx) => ticket.numbers[idx] === num)
+    );
+  };
 
-    const maxMatches = Math.max(...ticketsWithMatches.map(t => t.matches));
+  const renderRulesCard = () => (
+    <div className="rules-card">
+      <div className="rules-title">📜 Çekiliş Kuralları</div>
+      <p className="rules-text">
+        {lottery?.rules?.trim() || 'Kurallar henüz eklenmedi.'}
+      </p>
+    </div>
+  );
 
-    // If no matches at all, pick random winner(s) to ensure at least 1 winner
-    if (maxMatches === 0) {
-      const randomIndex = Math.floor(Math.random() * confirmedTickets.length);
-      return [confirmedTickets[randomIndex]];
+  const getHighlightIndices = (ticket: TicketType) => {
+    let matchCount = 0;
+    for (let i = 0; i < drawnNumbers.length; i++) {
+      if (ticket.numbers[i] === drawnNumbers[i]) {
+        matchCount++;
+      } else {
+        break;
+      }
     }
+    return Array.from({ length: matchCount }, (_, i) => i);
+  };
 
-    return ticketsWithMatches
-      .filter(t => t.matches === maxMatches)
-      .map(t => t.ticket);
+  const finishSession = async () => {
+    if (!user?.isAdmin || !session || session.status === 'completed') return;
+    const winners = findWinners(drawnNumbers);
+    await updateDoc(doc(db, 'lotterySessions', session.id), {
+      status: 'completed',
+      currentPhase: 'completed',
+      winnerTicketIds: winners.map(t => t.id),
+      completedAt: new Date(),
+      currentNumber: null,
+      lastInvalidNumber: null
+    });
   };
 
   if (!lottery) {
@@ -303,7 +377,22 @@ export function LotterySession() {
             )}
           </div>
           <p className="waiting-message">Yönetici çekilişi başlattığında otomatik olarak başlayacak</p>
+          <div className="pre-stats">
+            <div className="pre-stat">
+              <span>Toplam Değer</span>
+              <strong>{lottery.ticketPrice * lottery.maxTickets} TL</strong>
+            </div>
+            <div className="pre-stat">
+              <span>Kalan Bilet</span>
+              <strong>{availableCount}</strong>
+            </div>
+            <div className="pre-stat">
+              <span>Satılan</span>
+              <strong>{allTickets.filter(t => t.status === 'confirmed').length}</strong>
+            </div>
+          </div>
         </div>
+        {renderRulesCard()}
       </div>
     );
   }
@@ -327,6 +416,7 @@ export function LotterySession() {
             Çekilişi Şimdi Başlat
           </button>
         </div>
+        {renderRulesCard()}
       </div>
     );
   }
@@ -342,93 +432,189 @@ export function LotterySession() {
           <h1>Çekiliş Bekleniyor</h1>
           <p>Yönetici çekilişi başlatmasını bekliyoruz...</p>
         </div>
+        {renderRulesCard()}
       </div>
     );
   }
 
   return (
     <div className="lottery-session">
-      {showConfetti && <div className="confetti-container">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <div key={i} className="confetti" style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 2}s`,
-            backgroundColor: ['#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b'][Math.floor(Math.random() * 5)]
-          }} />
-        ))}
-      </div>}
+      {showConfetti && (
+        <div className="confetti-container">
+          {Array.from({ length: 50 }).map((_, i) => (
+            <div
+              key={i}
+              className="confetti"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 2}s`,
+                backgroundColor: ['#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b'][Math.floor(Math.random() * 5)]
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="viewers-badge-live">
         👥 {viewersCount} kişi izliyor
       </div>
 
-      <div className="drawing-area">
-        <h1 className="session-title">🎉 Çekiliş Başladı! 🎉</h1>
-
-        <div className="balloon-container">
-          {isDrawing ? (
-            <div className="balloon-drawing">
-              <div className="balloon">
-                <div className="balloon-string"></div>
-                🎈
-              </div>
-              <p className="drawing-text">Numara çekiliyor...</p>
+      <div className="drawing-grid">
+        <div className="drawing-card">
+          <div className="drawing-header">
+            <div>
+              <p className="session-subtitle">{lottery.lotteryName || 'Çekiliş'}</p>
+              <h1 className="session-title">Canlı Çekiliş</h1>
             </div>
-          ) : currentNumber !== null && currentNumber !== undefined ? (
-            <div className="number-reveal">
-              <div className="drawn-number">{currentNumber}</div>
+            <div className="session-meta">
+              <span>📅 {new Date(lottery.eventDate).toLocaleString('tr-TR')}</span>
+              <span>🎟️ {allTickets.length} onaylı bilet</span>
             </div>
-          ) : null}
-        </div>
-
-        <div className="drawn-numbers">
-          <h2>Çekilen Numaralar</h2>
-          <div className="numbers-display">
-            {drawnNumbers.map((num, index) => (
-              <div key={index} className="drawn-number-badge">
-                {num}
-              </div>
-            ))}
-            {Array.from({ length: 5 - drawnNumbers.length }).map((_, i) => (
-              <div key={`empty-${i}`} className="empty-number-badge">?</div>
-            ))}
           </div>
+
+          <div className="roller-area">
+            <div className={`roller ${isDrawing ? 'spinning' : ''}`}>
+              <div className="roller-inner">
+                <div className="roller-number">{currentNumber ?? '•'}</div>
+                <div className="roller-glow" />
+              </div>
+              <div className="roller-shadow" />
+            </div>
+            <div className="roller-status">
+              {session.status === 'completed' ? (
+                <span className="status-pill success">Çekiliş tamamlandı</span>
+              ) : session.currentPhase === 'invalid' ? (
+                <span className="status-pill danger">
+                  Geçersiz numara: {invalidNumber ?? '-'} (prefix eşleşmedi)
+                </span>
+              ) : session.currentPhase === 'drawing' ? (
+                <span className="status-pill info">Numara karıştırılıyor...</span>
+              ) : (
+                <span className="status-pill info">
+                  Çekilen numara: {currentNumber ?? 'Hazırlanıyor'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="slots-row">
+            {Array.from({ length: 5 }).map((_, idx) => {
+              const value = drawnNumbers[idx];
+              const isActive = drawnNumbers.length === idx + 1 && session.currentPhase === 'reveal';
+              return (
+                <div key={idx} className={`number-slot ${value !== undefined ? 'filled' : ''} ${isActive ? 'active' : ''}`}>
+                  <div className="slot-index">{idx + 1}</div>
+                  <div className="slot-value">{value !== undefined ? value : '•'}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="drawn-preview">
+            <div className="preview-label">Çekilen Sıra</div>
+            <div className="preview-digits">
+              {drawnNumbers.map((num, index) => (
+                <span key={index} className="preview-digit">{num}</span>
+              ))}
+              {Array.from({ length: 5 - drawnNumbers.length }).map((_, i) => (
+                <span key={`p-${i}`} className="preview-placeholder">?</span>
+              ))}
+            </div>
+          </div>
+
+          {session.status === 'completed' && (
+            <div className="winner-announcement">
+              {winner ? (
+                <div className="winner-card user-winner">
+                  <h2>🎊 TEBRİKLER! 🎊</h2>
+                  <p className="winner-message">KAZANDINIZ!</p>
+                  <Ticket ticket={winner} highlightedIndices={getHighlightIndices(winner)} />
+                </div>
+              ) : session.winnerTicketIds.length > 0 ? (
+                <div className="winner-card">
+                  <h2>Çekiliş Tamamlandı</h2>
+                  <p className="winner-message">
+                    {session.winnerTicketIds.length} kazanan var
+                  </p>
+                </div>
+              ) : (
+                <div className="winner-card">
+                  <h2>Çekiliş Tamamlandı</h2>
+                  <p className="winner-message">Uyan bilet bulunamadı</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {session.status === 'completed' && (
-          <div className="winner-announcement">
-            {winner ? (
-              <div className="winner-card user-winner">
-                <h2>🎊 TEBRİKLER! 🎊</h2>
-                <p className="winner-message">KAZANDINIZ!</p>
-                <Ticket ticket={winner} highlightedNumbers={drawnNumbers} />
-              </div>
-            ) : session.winnerTicketIds.length > 0 ? (
-              <div className="winner-card">
-                <h2>Çekiliş Tamamlandı</h2>
-                <p className="winner-message">
-                  {session.winnerTicketIds.length} kişi kazandı!
-                </p>
-              </div>
-            ) : (
-              <div className="winner-card">
-                <h2>Çekiliş Tamamlandı</h2>
-                <p className="winner-message">Kazanan belirlendi</p>
+        <div className="side-column">
+          {renderRulesCard()}
+          <div className="info-card">
+            <div className="info-row">
+              <span>💰 Bilet Fiyatı</span>
+              <strong>{lottery.ticketPrice} TL</strong>
+            </div>
+            <div className="info-row">
+              <span>📦 Onaylı Bilet</span>
+              <strong>{allTickets.filter(t => t.status === 'confirmed').length}</strong>
+            </div>
+            <div className="info-row">
+              <span>🔢 Çekilen Hane</span>
+              <strong>{drawnNumbers.length}/5</strong>
+            </div>
+            {invalidNumber !== null && session.currentPhase === 'invalid' && (
+              <div className="info-row danger-text">
+                <span>Geçersiz</span>
+                <strong>{invalidNumber}</strong>
               </div>
             )}
           </div>
-        )}
+          {user?.isAdmin && session.status === 'active' && (
+            <div className="controls-card">
+              <div className="controls-row">
+                <button
+                  className="primary-button wide"
+                  onClick={drawNumber}
+                  disabled={drawnNumbers.length >= 5 || pendingCandidate !== null}
+                >
+                  {drawnNumbers.length >= 5 ? 'Tüm numaralar çekildi' : 'Numara Çek'}
+                </button>
+              </div>
+              {pendingCandidate !== null && (
+                <div className="invalid-box">
+                  <p>Geçersiz numara: {pendingCandidate}. Prefix eşleşmedi.</p>
+                  <div className="controls-row">
+                    <button className="secondary-button" onClick={retryDraw}>Tekrar Çek</button>
+                    <button className="primary-button" onClick={acceptInvalid}>Devam Et</button>
+                  </div>
+                </div>
+              )}
+              <div className="controls-row">
+                <button
+                  className="secondary-button"
+                  onClick={() => finishSession()}
+                  disabled={drawnNumbers.length === 0}
+                >
+                  Çekilişi Sonlandır
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {userTickets.length > 0 && (
         <div className="user-tickets-section">
-          <h2>Biletlerim</h2>
+          <div className="user-tickets-header">
+            <h2>Biletlerim</h2>
+            <p className="user-tickets-hint">Soldan sağa sırayla eşleşen rakamlar ışık yanar.</p>
+          </div>
           <div className="tickets-grid">
             {userTickets.map(ticket => (
               <Ticket
                 key={ticket.id}
                 ticket={ticket}
-                highlightedNumbers={drawnNumbers}
+                highlightedIndices={getHighlightIndices(ticket)}
               />
             ))}
           </div>

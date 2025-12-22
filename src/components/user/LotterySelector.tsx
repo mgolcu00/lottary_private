@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { LotterySettings } from '../../types';
+import { toDateSafe } from '../../utils/date';
 import './LotterySelector.css';
 
 interface LotterySelectorProps {
@@ -23,9 +24,9 @@ export function LotterySelector({ onSelect }: LotterySelectorProps) {
         return {
           ...data,
           id: doc.id,
-          eventDate: data.eventDate.toDate ? data.eventDate.toDate() : new Date(data.eventDate),
-          createdAt: data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-          updatedAt: data.updatedAt.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt)
+          eventDate: toDateSafe(data.eventDate),
+          createdAt: toDateSafe(data.createdAt),
+          updatedAt: toDateSafe(data.updatedAt)
         } as LotterySettings;
       });
       setLotteries(lotteriesList);

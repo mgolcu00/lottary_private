@@ -8,10 +8,13 @@ export type User = {
 export type LotterySettings = {
   id: string;
   lotteryName?: string;
+  rules?: string;
   eventDate: Date;
   ticketPrice: number;
   maxTickets: number;
   isActive: boolean;
+  salesOpen?: boolean;
+  status?: 'scheduled' | 'active' | 'completed' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
 };
@@ -44,6 +47,8 @@ export type LotterySession = {
   id: string;
   lotteryId: string;
   status: 'waiting' | 'active' | 'completed';
+  currentPhase?: 'drawing' | 'invalid' | 'reveal' | 'completed';
+  lastInvalidNumber?: number | null;
   drawnNumbers: number[];
   currentNumber?: number;
   winnerTicketIds: string[];

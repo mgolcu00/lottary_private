@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap');
+
 .ticket-container {
   position: relative;
   width: 100%;
@@ -29,23 +31,24 @@
 
 /* Serial Number Overlay */
 .ticket-serial {
-  position: absolute;
-  top: 30%;
-  left: 64%;
-  width: 29%;
-  height: 18%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    position: absolute;
+    right: 8px;
+    bottom: 3%;
+    width: 20%;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
+
+
 .serial-number {
-  font-size: clamp(14px, 3vw, 24px);
+  font-size:8px;
   font-weight: 900;
-  color: #2c3e50;
+  color: #2f3c49;
   font-family: 'Courier New', monospace;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  letter-spacing: 1px;
 }
 
 /* Numbers Overlay */
@@ -57,30 +60,57 @@
   height: 100%;
 }
 
+/* (Opsiyonel ama önerilir) Google Fonts:
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap');
+*/
+
+
 .ticket-number {
   position: absolute;
-  top: 58%;
-  width: 7%;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
+  top: 63%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(12px, 2.5vw, 20px);
+
+  /* Font & sayı hizası */
+  font-family: "Montserrat", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+
+  font-size: clamp(14px, 2.5vw, 22px);
   font-weight: 900;
-  color: #2c3e50;
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #d4af37;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s;
-  transform: translateY(-50%);
+
+  /* Daha okunur altın tonu (açık mavi üstünde daha net) */
+  color: #ffdd33;
+
+  /* Degrade ama daha kontrastlı */
+  background: linear-gradient(
+    180deg,
+    #fff7cf 0%,
+    #ffd36a 35%,
+    #f2b63a 65%,
+    #c98b16 100%
+  );
+  -webkit-background-clip: text;
+
+  /* Okunurluğu garantileyen ince kontur */
+  -webkit-text-stroke: 0.9px rgba(6, 45, 62, 0.85); /* koyu teal stroke */
+  paint-order: stroke fill;
+
+  /* Kontrast gölge (glow değil, okunurluk gölgesi) */
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.33),
+    0 2px 6px rgba(0, 0, 0, 0.45);
+
+  /* Smooth */
+  -webkit-font-smoothing: antialiased;
 }
 
-.num-1 { left: 33%; }
-.num-2 { left: 42%; }
-.num-3 { left: 51%; }
-.num-4 { left: 60%; }
-.num-5 { left: 69%; }
+.num-1 { right: 54%; }
+.num-2 { right: 43%; }
+.num-3 { right: 33%; }
+.num-4 { right: 22%; }
+.num-5 { right: 11%; }
 
 .ticket-number.highlighted {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -103,8 +133,8 @@
 /* Price Overlay */
 .ticket-price-overlay {
   position: absolute;
-  top: 74%;
-  left: 60%;
+  top: 10%;
+  right: 10%;
   width: 30%;
   height: 9%;
   display: flex;
@@ -115,19 +145,19 @@
 /* Status Badge - Floating */
 .ticket-status-container {
   position: absolute;
-  top: -12px;
-  right: -12px;
+  bottom: -2px;
+  left: -2px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 4px;
+  align-items: flex-start;
   z-index: 20;
 }
 
 .ticket-status-badge {
-  padding: 8px 16px;
+  padding: 4px 8px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -153,7 +183,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
   font-size: 12px;
@@ -163,7 +193,7 @@
 }
 
 .owner-icon {
-  font-size: 14px;
+  font-size: 8px;
 }
 
 .owner-name {
