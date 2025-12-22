@@ -349,6 +349,33 @@
   font-weight: 800;
 }
 
+.amorti-panel {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.amorti-item {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.amorti-label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.amorti-value {
+  font-size: 18px;
+  font-weight: 800;
+}
+
 .winner-announcement {
   margin-top: 40px;
 }
@@ -488,6 +515,102 @@
 .winner-note {
   color: rgba(255,255,255,0.9);
   font-weight: 600;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: white;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  margin-bottom: 16px;
+}
+
+.session-date {
+  margin: 4px 0 0;
+  color: #555;
+  font-weight: 700;
+}
+
+.result-pot {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.result-card {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+}
+
+.result-card h2 {
+  margin-top: 0;
+  color: #1f2937;
+}
+
+.winner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.winner-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.winner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.winner-name {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.winner-ticket {
+  color: #475569;
+  font-weight: 700;
+}
+
+.winner-amount {
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.amorti-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-weight: 800;
+}
+
+.result-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
 }
 
 .side-column {

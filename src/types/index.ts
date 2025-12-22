@@ -49,11 +49,14 @@ export type LotterySession = {
   id: string;
   lotteryId: string;
   status: 'waiting' | 'active' | 'completed';
+  stage?: 'amorti1' | 'amorti2' | 'grand' | 'completed';
   currentPhase?: 'drawing' | 'invalid' | 'reveal' | 'completed';
   lastInvalidNumber?: number | null;
   drawnNumbers: number[];
   currentNumber?: number;
   winnerTicketIds: string[];
+  amortiFirstNumber?: number | null;
+  amortiSecondNumber?: number | null;
   startedAt?: Date;
   completedAt?: Date;
 };
