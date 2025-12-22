@@ -128,7 +128,7 @@ export function UserHome() {
               + Bilet Al
             </button>
           )}
-          {canBuyTickets && userTickets.length > 0 && userTickets.every(t => t.status === 'confirmed') && (
+          {canBuyTickets && userTickets.length > 0 && (
             <button onClick={handleBuyTicket} className="buy-button">
               + Daha Fazla Bilet Al
             </button>

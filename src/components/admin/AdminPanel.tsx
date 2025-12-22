@@ -236,7 +236,6 @@ export function AdminPanel() {
         confirmedAt: new Date()
       });
 
-      alert('Bilet isteği onaylandı!');
     } catch (error) {
       console.error('Error approving request:', error);
       alert('İstek onaylanamadı. Lütfen tekrar deneyin.');

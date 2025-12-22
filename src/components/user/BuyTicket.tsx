@@ -15,7 +15,8 @@ export function BuyTicket() {
   const [lottery, setLottery] = useState<LotterySettings | null>(null);
   const [availableTickets, setAvailableTickets] = useState<TicketType[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<TicketType | null>(null);
-  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export function BuyTicket() {
 
   const handleTicketSelect = (ticket: TicketType) => {
     setSelectedTicket(ticket);
+    setShowRequestModal(true);
   };
 
   const handleRequestTicket = async () => {
@@ -94,7 +96,8 @@ export function BuyTicket() {
         requestedAt: new Date()
       });
 
-      setShowConfirmation(true);
+      setShowRequestModal(false);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error requesting ticket:', error);
       alert('Bilet isteği gönderilemedi. Lütfen tekrar deneyin.');
@@ -102,53 +105,8 @@ export function BuyTicket() {
     setLoading(false);
   };
 
-  const handleClose = () => {
-    navigate('/');
-  };
-
   if (!lottery) {
     return null;
-  }
-
-  if (showConfirmation) {
-    return (
-      <div className="buy-ticket-page">
-        <div className="buy-ticket-container">
-          <div className="confirmation-card">
-            <div className="success-icon">✅</div>
-            <h1>İstek Gönderildi!</h1>
-            <p className="confirmation-message">
-              Bilet talebiniz başarıyla gönderildi.
-              <br />
-              <br />
-              <strong>Yapmanız Gerekenler:</strong>
-            </p>
-            <div className="instructions">
-              <div className="instruction-item">
-                <span className="step-number">1</span>
-                <p>
-                  <strong>{lottery.ticketPrice} TL</strong> ödeme yapın
-                </p>
-              </div>
-              <div className="instruction-item">
-                <span className="step-number">2</span>
-                <p>Admin onayını bekleyin</p>
-              </div>
-              <div className="instruction-item">
-                <span className="step-number">3</span>
-                <p>Onaylandıktan sonra biletiniz aktif olacak</p>
-              </div>
-            </div>
-            <div className="warning-box">
-              ⚠️ Çekiliş tarihine 1 saat kala onaylanmayan biletler iptal edilecektir.
-            </div>
-            <button onClick={handleClose} className="close-button">
-              Ana Sayfaya Dön
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -163,20 +121,6 @@ export function BuyTicket() {
             💰 {lottery.ticketPrice} TL
           </div>
         </div>
-
-        {selectedTicket && (
-          <div className="selected-ticket-section">
-            <h2>Seçilen Bilet</h2>
-            <Ticket ticket={selectedTicket} showStatus={false} />
-            <button
-              onClick={handleRequestTicket}
-              disabled={loading}
-              className="request-button"
-            >
-              {loading ? 'Gönderiliyor...' : 'Satın Alma İsteği Gönder'}
-            </button>
-          </div>
-        )}
 
         <div className="available-tickets-section">
           <h2>
@@ -203,6 +147,87 @@ export function BuyTicket() {
           )}
         </div>
       </div>
+
+      {showRequestModal && selectedTicket && (
+        <div className="modal-overlay" onClick={() => !loading && setShowRequestModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Satın al</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowRequestModal(false)}
+                aria-label="Kapat"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="modal-subtitle">
+              #{selectedTicket.ticketNumber.toString().padStart(6, '0')} numaralı bileti satın almak istiyor musun?
+            </p>
+            <div className="modal-ticket-preview">
+              <Ticket ticket={selectedTicket} showStatus={false} />
+            </div>
+            <div className="modal-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setShowRequestModal(false)}
+                disabled={loading}
+              >
+                Vazgeç
+              </button>
+              <button
+                className="primary-button"
+                onClick={handleRequestTicket}
+                disabled={loading}
+              >
+                {loading ? 'Gönderiliyor...' : `${lottery.ticketPrice} TL - Satın al`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSuccessModal && (
+        <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
+          <div className="modal-card success" onClick={(e) => e.stopPropagation()}>
+            <div className="success-icon">✅</div>
+            <h3>İstek Gönderildi!</h3>
+            <p className="confirmation-message">
+              Ödemenizi tamamlayıp admin onayını bekleyin. Onay sonrası biletiniz aktif olacak.
+            </p>
+            <div className="instructions">
+              <div className="instruction-item">
+                <span className="step-number">1</span>
+                <p><strong>{lottery.ticketPrice} TL</strong> ödeyin</p>
+              </div>
+              <div className="instruction-item">
+                <span className="step-number">2</span>
+                <p>Onayı bekleyin</p>
+              </div>
+            </div>
+            <div className="warning-box">
+              ⚠️ Çekiliş tarihine 1 saat kala onaylanmayan biletler iptal edilir.
+            </div>
+            <div className="modal-actions">
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setSelectedTicket(null);
+                }}
+              >
+                Devam et
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => navigate('/')}
+              >
+                Çekilişe dön
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
