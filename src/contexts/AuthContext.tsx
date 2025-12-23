@@ -30,6 +30,7 @@ interface AuthContextType {
   confirmEmailLink: (email: string) => Promise<void>;
   signUpWithUsername: (username: string, password: string) => Promise<void>;
   signInWithUsername: (username: string, password: string) => Promise<void>;
+  signInOrSignUp: (username: string, password: string) => Promise<{ isNewUser: boolean }>;
   updateDisplayName: (name: string) => Promise<void>;
   acceptTerms: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -254,6 +255,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Smart sign in or sign up - checks username first, then password
+  const signInOrSignUp = async (username: string, password: string): Promise<{ isNewUser: boolean }> => {
+    const trimmedUsername = username.trim().toLowerCase();
+
+    // Validate username format
+    if (trimmedUsername.length < 3) {
+      throw new Error('Kullanıcı adı en az 3 karakter olmalıdır');
+    }
+    if (!/^[a-z0-9_]+$/.test(trimmedUsername)) {
+      throw new Error('Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir');
+    }
+
+    // FIRST: Check if username exists in DB (WITHOUT logging in to Firebase yet)
+    const authUserDoc = await getDoc(doc(db, 'authUsers', trimmedUsername));
+
+    if (authUserDoc.exists()) {
+      // Username exists - verify password BEFORE logging in
+      const authUserData = authUserDoc.data();
+      const storedPasswordHash = authUserData.passwordHash;
+      const inputPasswordHash = await hashPassword(password);
+
+      if (inputPasswordHash !== storedPasswordHash) {
+        // Password wrong - DO NOT login, just throw error
+        throw new Error('Şifre yanlış');
+      }
+
+      // Password correct - NOW sign in to Firebase
+      await signInAnonymously(auth);
+      localStorage.setItem('lottery_username', trimmedUsername);
+
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userData = await loadUserData(currentUser);
+        setUser(userData);
+      }
+
+      return { isNewUser: false };
+    } else {
+      // Username doesn't exist - create new user
+      // NOW sign in to Firebase
+      await signInAnonymously(auth);
+
+      const passwordHash = await hashPassword(password);
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create auth entry
+      await setDoc(doc(db, 'authUsers', trimmedUsername), {
+        username: trimmedUsername,
+        passwordHash: passwordHash,
+        userId: userId,
+        createdAt: new Date()
+      });
+
+      // Create user document
+      await setDoc(doc(db, 'users', userId), {
+        email: `${trimmedUsername}@lottery.local`,
+        username: trimmedUsername,
+        displayName: '',
+        isAdmin: false,
+        createdAt: new Date(),
+        termsAccepted: false,
+        isOver18: false
+      });
+
+      // Save username
+      localStorage.setItem('lottery_username', trimmedUsername);
+
+      // Reload user data
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userData = await loadUserData(currentUser);
+        setUser(userData);
+      }
+
+      return { isNewUser: true };
+    }
+  };
+
   const updateDisplayName = async (name: string) => {
     if (!user) return;
 
@@ -299,6 +378,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       confirmEmailLink,
       signUpWithUsername,
       signInWithUsername,
+      signInOrSignUp,
       updateDisplayName,
       acceptTerms,
       signOut

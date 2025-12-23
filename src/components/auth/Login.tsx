@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import './Login.css';
 
 // Snowflakes for Christmas theme
@@ -41,7 +42,8 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authMode, setAuthMode] = useState<'username' | 'email'>('username');
-  const { signInWithGoogle, sendEmailLink, signUpWithUsername, signInWithUsername } = useAuth();
+  const { signInWithGoogle, sendEmailLink, signInOrSignUp } = useAuth();
+  const toast = useToast();
 
   const handleUsernameAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,21 +51,16 @@ export function Login() {
 
     setLoading(true);
     try {
-      // Try to sign in first
-      try {
-        await signInWithUsername(username, password);
-      } catch (signInError) {
-        // If user not found, try to sign up
-        if (signInError instanceof Error && signInError.message === 'Kullanıcı bulunamadı') {
-          await signUpWithUsername(username, password);
-        } else {
-          throw signInError;
-        }
+      const result = await signInOrSignUp(username, password);
+      if (result.isNewUser) {
+        toast.success('Hoş geldiniz! Hesabınız oluşturuldu.');
+      } else {
+        toast.success('Tekrar hoş geldiniz!');
       }
     } catch (error: unknown) {
       console.error('Error with username auth:', error);
       const errorMessage = error instanceof Error ? error.message : 'Bir hata oluştu';
-      alert(errorMessage);
+      toast.error(errorMessage);
       setLoading(false);
     }
   };
@@ -76,9 +73,10 @@ export function Login() {
     try {
       await sendEmailLink(email);
       setEmailSent(true);
+      toast.success('Email gönderildi! Lütfen gelen kutunuzu kontrol edin.');
     } catch (error) {
       console.error('Error sending email link:', error);
-      alert('Email gönderilemedi. Lütfen tekrar deneyin.');
+      toast.error('Email gönderilemedi. Lütfen tekrar deneyin.');
     }
     setLoading(false);
   };
@@ -87,9 +85,10 @@ export function Login() {
     setLoading(true);
     try {
       await signInWithGoogle();
+      toast.success('Google ile giriş başarılı!');
     } catch (error) {
       console.error('Error signing in with Google:', error);
-      alert('Google ile giriş yapılamadı. Lütfen tekrar deneyin.');
+      toast.error('Google ile giriş yapılamadı. Lütfen tekrar deneyin.');
     }
     setLoading(false);
   };

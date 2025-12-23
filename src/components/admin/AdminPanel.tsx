@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, writeBatch, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -176,13 +176,24 @@ export function AdminPanel() {
     const generatedCombinations = new Set<string>();
 
     for (let i = 1; i <= maxTickets; i++) {
-      // Generate unique 5-number combination within selected range
+      // Generate unique 5-number combination with special algorithm
       let numbers: number[];
       let combination: string;
 
       do {
-        numbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * rangeMax) + 1);
-        combination = numbers.join('');
+        // 1st number: 1, 2, or 3
+        // 2nd number: 4, 5, or 6
+        // 3rd number: 7, 8, or 9
+        // 4th number: 1-9
+        // 5th number: 1-9
+        numbers = [
+          Math.floor(Math.random() * 3) + 1,      // 1-3
+          Math.floor(Math.random() * 3) + 4,      // 4-6
+          Math.floor(Math.random() * 3) + 7,      // 7-9
+          Math.floor(Math.random() * rangeMax) + 1, // 1-9 or 1-99 based on settings
+          Math.floor(Math.random() * rangeMax) + 1  // 1-9 or 1-99 based on settings
+        ];
+        combination = numbers.join('-');
       } while (generatedCombinations.has(combination));
 
       generatedCombinations.add(combination);
@@ -373,6 +384,135 @@ export function AdminPanel() {
     } catch (error) {
       console.error('Error deactivating lottery:', error);
       toast.error('Çekiliş pasif yapılamadı.');
+    }
+  };
+
+  // DELETE LOTTERY (with CASCADE delete of all related tickets and requests)
+  const deleteLottery = async () => {
+    if (!lottery) return;
+    const confirmed = await toast.confirm(
+      `⚠️ TEHLİKELİ! "${lottery.lotteryName || 'Çekiliş'}" silinecek ve bağlantılı TÜM biletler ve istekler de silinecek. Emin misiniz?`
+    );
+    if (!confirmed) return;
+
+    try {
+      // 1. Delete all tickets for this lottery
+      const ticketsQuery = query(collection(db, 'tickets'), where('lotteryId', '==', lottery.id));
+      const ticketsSnapshot = await getDocs(ticketsQuery);
+      const ticketDeleteBatch = writeBatch(db);
+      ticketsSnapshot.docs.forEach((ticketDoc) => {
+        ticketDeleteBatch.delete(ticketDoc.ref);
+      });
+      await ticketDeleteBatch.commit();
+
+      // 2. Delete all ticket requests for this lottery
+      const requestsQuery = query(collection(db, 'ticketRequests'), where('lotteryId', '==', lottery.id));
+      const requestsSnapshot = await getDocs(requestsQuery);
+      const requestDeleteBatch = writeBatch(db);
+      requestsSnapshot.docs.forEach((requestDoc) => {
+        requestDeleteBatch.delete(requestDoc.ref);
+      });
+      await requestDeleteBatch.commit();
+
+      // 3. Delete lottery sessions for this lottery
+      const sessionsQuery = query(collection(db, 'lotterySessions'), where('lotteryId', '==', lottery.id));
+      const sessionsSnapshot = await getDocs(sessionsQuery);
+      const sessionDeleteBatch = writeBatch(db);
+      sessionsSnapshot.docs.forEach((sessionDoc) => {
+        sessionDeleteBatch.delete(sessionDoc.ref);
+      });
+      await sessionDeleteBatch.commit();
+
+      // 4. Finally delete the lottery itself
+      await deleteDoc(doc(db, 'lotteries', lottery.id));
+
+      toast.success(`Çekiliş ve bağlantılı ${ticketsSnapshot.size} bilet, ${requestsSnapshot.size} istek silindi.`);
+      setLottery(null);
+    } catch (error) {
+      console.error('Error deleting lottery:', error);
+      toast.error('Çekiliş silinemedi.');
+    }
+  };
+
+  // DELETE SINGLE TICKET
+  const deleteTicket = async (ticketId: string) => {
+    const confirmed = await toast.confirm('Bu bileti silmek istediğine emin misin?');
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, 'tickets', ticketId));
+      toast.success('Bilet silindi.');
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+      toast.error('Bilet silinemedi.');
+    }
+  };
+
+  // DELETE USER
+  const deleteUser = async (userId: string, displayName: string) => {
+    const confirmed = await toast.confirm(
+      `⚠️ "${displayName}" kullanıcısını silmek istediğine emin misin? Kullanıcının biletleri de silinecek.`
+    );
+    if (!confirmed) return;
+
+    try {
+      // Delete user's tickets
+      const userTicketsQuery = query(collection(db, 'tickets'), where('userId', '==', userId));
+      const userTicketsSnapshot = await getDocs(userTicketsQuery);
+      const ticketBatch = writeBatch(db);
+      userTicketsSnapshot.docs.forEach((ticketDoc) => {
+        ticketBatch.delete(ticketDoc.ref);
+      });
+      await ticketBatch.commit();
+
+      // Delete user's ticket requests
+      const userRequestsQuery = query(collection(db, 'ticketRequests'), where('userId', '==', userId));
+      const userRequestsSnapshot = await getDocs(userRequestsQuery);
+      const requestBatch = writeBatch(db);
+      userRequestsSnapshot.docs.forEach((requestDoc) => {
+        requestBatch.delete(requestDoc.ref);
+      });
+      await requestBatch.commit();
+
+      // Delete user document
+      await deleteDoc(doc(db, 'users', userId));
+
+      toast.success(`Kullanıcı ve ${userTicketsSnapshot.size} bilet silindi.`);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Kullanıcı silinemedi.');
+    }
+  };
+
+  // ADD MANUAL TICKET (for admin to create tickets manually)
+  const addManualTicket = async () => {
+    if (!lottery) return;
+
+    const ticketNumber = prompt('Bilet numarası:');
+    if (!ticketNumber) return;
+
+    const numbersInput = prompt('5 rakam gir (virgül ile ayrılmış, örn: 1,2,3,4,5):');
+    if (!numbersInput) return;
+
+    try {
+      const numbers = numbersInput.split(',').map(n => parseInt(n.trim()));
+      if (numbers.length !== 5 || numbers.some(isNaN)) {
+        toast.error('Geçersiz rakamlar. 5 rakam girmelisin.');
+        return;
+      }
+
+      await addDoc(collection(db, 'tickets'), {
+        ticketNumber: parseInt(ticketNumber),
+        lotteryId: lottery.id,
+        status: 'available',
+        numbers,
+        price: lottery.ticketPrice
+      });
+
+      toast.success('Bilet manuel olarak eklendi!');
+    } catch (error) {
+      console.error('Error adding manual ticket:', error);
+      toast.error('Bilet eklenemedi.');
     }
   };
 
@@ -679,20 +819,30 @@ export function AdminPanel() {
                     <div className="adminpanel__user-name-large">{u.displayName || 'İsimsiz'}</div>
                     <div className="adminpanel__user-email-small">{u.email}</div>
                     {u.isAdmin && <span className="adminpanel__admin-badge">Admin</span>}
+                                        {user.uid !== u.uid && (
+                    <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                      <button
+                        onClick={() => handleToggleAdmin(u)}
+                        className={`adminpanel__toggle-admin-button ${u.isAdmin ? 'remove' : 'add'}`}
+                      >
+                        {u.isAdmin ? '❌ Admin Kaldır' : '⭐ Admin Yap'}
+                      </button>
+                      <button
+                        onClick={() => deleteUser(u.uid, u.displayName || 'İsimsiz')}
+                        className="adminpanel__delete-button"
+                      >
+                        🗑️ Sil
+                      </button>
+                    </div>
+                  )}
                   </div>
                   <div className="adminpanel__user-stats">
                     <span className="adminpanel__user-stat">
                       🎫 {allTickets.filter(t => t.userId === u.uid && t.status === 'confirmed').length}
                     </span>
+                  
                   </div>
-                  {user.uid !== u.uid && (
-                    <button
-                      onClick={() => handleToggleAdmin(u)}
-                      className={`adminpanel__toggle-admin-button ${u.isAdmin ? 'remove' : 'add'}`}
-                    >
-                      {u.isAdmin ? '❌ Admin Kaldır' : '⭐ Admin Yap'}
-                    </button>
-                  )}
+
                 </div>
               ))}
             </div>
@@ -701,7 +851,12 @@ export function AdminPanel() {
 
         {activeTab === 'tickets' && (
           <div className="tickets-tab">
-            <h2>Tüm Biletler</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+              <h2>Tüm Biletler</h2>
+              <Button variant="primary" size="md" onClick={addManualTicket} icon="➕">
+                Manuel Bilet Ekle
+              </Button>
+            </div>
             <div className="adminpanel__tickets-filter">
               <button className="adminpanel__filter-btn all">Tümü ({allTickets.length})</button>
               <button className="adminpanel__filter-btn available">
@@ -722,6 +877,7 @@ export function AdminPanel() {
                     <th>Numaralar</th>
                     <th>Durum</th>
                     <th>Kullanıcı</th>
+                    <th>İşlemler</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -742,6 +898,14 @@ export function AdminPanel() {
                         </span>
                       </td>
                       <td>{ticket.userName || '-'}</td>
+                      <td>
+                        <button
+                          onClick={() => deleteTicket(ticket.id)}
+                          className="adminpanel__delete-button-small"
+                        >
+                          🗑️
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -825,9 +989,9 @@ export function AdminPanel() {
             </div>
             <div className="adminpanel__danger-zone">
               <h3>⚠️ Tehlikeli Bölge</h3>
-              <p>Çekilişi pasif hale getirmek veya silmek için dikkatli olun.</p>
-              <button className="adminpanel__danger-button" disabled>
-                Çekilişi Kapat (Yakında)
+              <p>Çekilişi silmek tüm bağlantılı biletleri, istekleri ve oturumları da siler. Bu işlem GERİ ALINAMAZ!</p>
+              <button className="adminpanel__danger-button" onClick={deleteLottery}>
+                🗑️ Çekilişi ve Tüm Verileri Sil
               </button>
             </div>
           </div>
