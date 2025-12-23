@@ -1,97 +1,201 @@
 .disclaimer-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.disclaimer-page::before {
+  content: '🎄';
+  position: absolute;
+  font-size: 120px;
+  top: 5%;
+  left: 5%;
+  opacity: 0.1;
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.disclaimer-page::after {
+  content: '🎁';
+  position: absolute;
+  font-size: 100px;
+  bottom: 5%;
+  right: 5%;
+  opacity: 0.1;
+  animation: float-slow 8s ease-in-out infinite;
+  animation-delay: 4s;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-30px) rotate(10deg); }
 }
 
 .disclaimer-container {
   max-width: 700px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: white;
   border-radius: 24px;
-  padding: 32px;
+  padding: 40px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.5s ease-out;
+  position: relative;
+  z-index: 1;
 }
 
-.disclaimer-header {
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.disclaimer-icon {
+  font-size: 80px;
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 20px;
+  animation: gentle-bounce 2s ease-in-out infinite;
 }
 
-.disclaimer-header h1 {
-  color: white;
+@keyframes gentle-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.disclaimer-container h1 {
+  color: #333;
   font-size: 32px;
   font-weight: 800;
-  margin: 0 0 8px 0;
+  margin: 0 0 10px 0;
+  text-align: center;
 }
 
 .disclaimer-subtitle {
-  color: #94a3b8;
+  color: #666;
   font-size: 16px;
-  margin: 0;
+  margin: 0 0 30px 0;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .disclaimer-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-/* Rules Section */
-.rules-section h2,
-.disclaimer-section h2 {
-  color: white;
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 12px 0;
-}
-
-.toggle-rules-btn {
-  padding: 8px 16px;
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  border-radius: 8px;
-  color: #93c5fd;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
+/* Info Cards */
+.info-card {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 16px;
+  overflow: hidden;
   transition: all 0.3s;
 }
 
-.toggle-rules-btn:hover {
-  background: rgba(59, 130, 246, 0.3);
-  border-color: rgba(59, 130, 246, 0.6);
+.info-card:hover {
+  border-color: #dee2e6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.rules-box,
-.disclaimer-box {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  background: white;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.3s;
+}
+
+.card-header:hover {
+  background: #f8f9fa;
+}
+
+.card-header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-icon {
+  font-size: 24px;
+}
+
+.card-title {
+  color: #333;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.toggle-icon {
+  color: #666;
+  font-size: 14px;
+  transition: transform 0.3s;
+}
+
+.card-body {
   padding: 20px;
-  margin-top: 12px;
+  background: white;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
 }
 
 .rule-item {
-  color: #cbd5e1;
+  display: flex;
+  gap: 12px;
+  color: #495057;
   font-size: 14px;
   line-height: 1.8;
-  margin-bottom: 8px;
-  padding-left: 8px;
+  margin-bottom: 10px;
 }
 
-.disclaimer-box p {
-  color: #cbd5e1;
+.rule-item:last-child {
+  margin-bottom: 0;
+}
+
+.bullet {
+  color: #667eea;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.disclaimer-text {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.disclaimer-text p {
+  color: #495057;
   font-size: 14px;
   line-height: 1.8;
-  margin: 0 0 12px 0;
+  margin: 0 0 14px 0;
 }
 
-.disclaimer-box p:last-child {
+.disclaimer-text p:last-child {
   margin-bottom: 0;
 }
 
@@ -99,7 +203,8 @@
 .consent-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  margin-top: 10px;
 }
 
 .consent-checkbox {
@@ -108,15 +213,16 @@
   gap: 12px;
   cursor: pointer;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
   border-radius: 12px;
   transition: all 0.3s;
 }
 
 .consent-checkbox:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: white;
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 
 .consent-checkbox input[type="checkbox"] {
@@ -125,20 +231,17 @@
   cursor: pointer;
   margin-top: 2px;
   flex-shrink: 0;
+  accent-color: #667eea;
 }
 
-.consent-checkbox span {
-  color: #e2e8f0;
+.checkbox-label {
+  color: #333;
   font-size: 15px;
   font-weight: 500;
   line-height: 1.6;
 }
 
-/* Actions */
-.disclaimer-actions {
-  margin-top: 8px;
-}
-
+/* Accept Button */
 .accept-button {
   width: 100%;
   padding: 16px 24px;
@@ -146,11 +249,12 @@
   border: none;
   border-radius: 12px;
   color: white;
-  font-weight: 800;
-  font-size: 16px;
+  font-weight: 700;
+  font-size: 17px;
   cursor: pointer;
   transition: all 0.3s;
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  margin-top: 10px;
 }
 
 .accept-button:hover:not(:disabled) {
@@ -164,43 +268,70 @@
   transform: none;
 }
 
+/* Scrollbar Styling */
+.disclaimer-text::-webkit-scrollbar {
+  width: 8px;
+}
+
+.disclaimer-text::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 4px;
+}
+
+.disclaimer-text::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 4px;
+}
+
+.disclaimer-text::-webkit-scrollbar-thumb:hover {
+  background: #868e96;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .disclaimer-container {
-    padding: 24px;
+    padding: 28px;
   }
 
-  .disclaimer-header h1 {
-    font-size: 24px;
+  .disclaimer-icon {
+    font-size: 60px;
+  }
+
+  .disclaimer-container h1 {
+    font-size: 26px;
   }
 
   .disclaimer-subtitle {
-    font-size: 14px;
+    font-size: 15px;
   }
 
-  .rules-section h2,
-  .disclaimer-section h2 {
-    font-size: 18px;
+  .card-title {
+    font-size: 16px;
   }
 
-  .rules-box,
-  .disclaimer-box {
+  .card-icon {
+    font-size: 20px;
+  }
+
+  .card-body {
     padding: 16px;
   }
 
-  .rules-box ul {
-    font-size: 13px;
-  }
-
-  .disclaimer-box p {
+  .rule-item,
+  .disclaimer-text p {
     font-size: 13px;
   }
 
   .consent-checkbox {
-    padding: 12px;
+    padding: 14px;
   }
 
-  .consent-checkbox span {
+  .checkbox-label {
     font-size: 14px;
+  }
+
+  .accept-button {
+    font-size: 16px;
+    padding: 14px 20px;
   }
 }

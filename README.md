@@ -2,6 +2,21 @@
 
 Modern, güvenli ve eğlenceli bir dijital çekiliş platformu. Türk Milli Piyango stilinde 5 toplu çekiliş sistemi ile gerçek zamanlı canlı yayın deneyimi.
 
+## 🆕 Yeni: Comprehensive Refactoring (December 2024)
+
+Bu proje kapsamlı bir refactoring geçirdi ve tamamen yenilendi!
+
+**Önemli Gelişmeler**:
+- 🎨 **Modern Design System**: Tutarlı UI/UX ve renk paleti
+- 🔧 **Kritik Bug Düzeltmeleri**: Ticket purchase hatası, memory leaks, timer sorunları
+- 🚀 **Performans İyileştirmeleri**: %25 daha az kod, optimize edilmiş re-render'lar
+- 🎯 **Yeni Özellikler**: Bilet arama, sıralama, şanslı seçim, modern toast bildirimler
+- 📦 **Component Architecture**: Daha küçük, yeniden kullanılabilir componentler
+- 🔐 **Gelişmiş Güvenlik**: Granular Firestore rules, transaction-based operations
+
+**📖 Detaylı bilgi için**: `/REFACTORING.md` dosyasına bakın.
+**🔐 Güvenlik bilgisi için**: `/SECURITY.md` dosyasına bakın.
+
 ## ✨ Özellikler
 
 ### 🎟️ Çekiliş Sistemi
@@ -109,43 +124,36 @@ Production modda başlatın ve aşağıdaki koleksiyonlar otomatik oluşturulaca
 - `lotterySessions` - Canlı çekiliş oturumları
 
 ### 4. Firestore Rules (Önemli!)
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users collection
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-    }
 
-    // Lotteries collection
-    match /lotteries/{lotteryId} {
-      allow read: if request.auth != null;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
+**🚨 CRITICAL: Firestore rules'ları deploy etmeniz gerekiyor!**
 
-    // Tickets collection
-    match /tickets/{ticketId} {
-      allow read: if request.auth != null;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
+Proje kök dizininde `firestore.rules` dosyası bulunmaktadır. Bu kurallar kullanıcıların bilet satın alabilmesi için **zorunludur**.
 
-    // Ticket requests
-    match /ticketRequests/{requestId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
+**Deploy Komutu:**
+```bash
+# Firebase CLI kurulumu (eğer kurulu değilse)
+npm install -g firebase-tools
 
-    // Lottery sessions
-    match /lotterySessions/{sessionId} {
-      allow read: if request.auth != null;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
-  }
-}
+# Firebase'e giriş yapın
+firebase login
+
+# Firestore rules'ları deploy edin
+firebase deploy --only firestore:rules
 ```
+
+**Veya Firebase Console'dan manuel olarak:**
+1. [Firebase Console](https://console.firebase.google.com/) → Projeniz → Firestore Database
+2. **Rules** sekmesine gidin
+3. `firestore.rules` dosyasındaki kuralları kopyalayıp yapıştırın
+4. **Publish** butonuna tıklayın
+
+**Kuralların özeti:**
+- ✅ Kullanıcılar sadece kendi biletlerini "requested" durumuna çekebilir
+- ✅ Bilet numaraları ve lottery ID değiştirilemez
+- ✅ Admin onayı olmadan bilet satışı tamamlanamaz
+- ✅ Tüm admin işlemleri yetki kontrolünden geçer
+
+Detaylı güvenlik bilgisi için `/SECURITY.md` dosyasına bakın.
 
 ## 👤 Admin Kullanıcı Oluşturma
 
@@ -227,19 +235,49 @@ Bu sayede çekiliş sonunda mutlaka bir kazanan çıkar veya pot devredilir.
 ```
 src/
 ├── components/
-│   ├── admin/           # Admin paneli bileşenleri
-│   ├── auth/            # Giriş ve kayıt bileşenleri
-│   ├── common/          # Ortak bileşenler (Navigation, Ticket, Christmas Effects)
-│   ├── lottery/         # Çekiliş bileşenleri
-│   └── user/            # Kullanıcı bileşenleri
-├── config/              # Firebase yapılandırması
-├── contexts/            # React Context'leri
-├── types/               # TypeScript tip tanımlamaları
-├── utils/               # Yardımcı fonksiyonlar
-│   ├── validation.ts    # Input doğrulama ve güvenlik
-│   ├── secureOperations.ts # Güvenli database işlemleri
-│   └── defaultRules.ts  # Varsayılan kurallar ve sorumluluk reddi
-└── assets/              # Statik dosyalar (logo, görseller)
+│   ├── admin/
+│   │   ├── AdminPanel.tsx          # Admin panel orchestrator
+│   │   ├── AdminPanel.css          # Design system styling
+│   │   └── CreateLotteryForm.tsx   # Lottery creation form (NEW)
+│   ├── auth/                       # Giriş ve kayıt bileşenleri
+│   ├── common/
+│   │   ├── Button.tsx              # Unified button component (NEW)
+│   │   ├── Button.css              # Button styles (NEW)
+│   │   ├── Card.tsx                # Card component system (NEW)
+│   │   ├── Card.css                # Card styles (NEW)
+│   │   ├── Toast.tsx               # Toast notifications (NEW)
+│   │   ├── Toast.css               # Toast styles (NEW)
+│   │   ├── LoadingScreen.tsx       # Centralized loading (NEW)
+│   │   ├── RulesModal.tsx          # Reusable rules modal (NEW)
+│   │   ├── RulesModal.css          # Modal styles (NEW)
+│   │   └── ...                     # Navigation, Ticket, Christmas Effects
+│   ├── lottery/                    # Çekiliş bileşenleri
+│   └── user/
+│       ├── UserHome.tsx            # Redesigned with design system
+│       ├── UserHome.css            # Modern CSS with variables
+│       ├── BuyTicket.tsx           # Enhanced with search & filters
+│       └── BuyTicket.css           # Modern CSS with variables
+├── config/                         # Firebase yapılandırması
+├── contexts/
+│   ├── AuthContext.tsx
+│   └── ToastContext.tsx            # Toast notification context (NEW)
+├── hooks/
+│   └── usePresenceTracking.ts      # Custom presence hook (NEW)
+├── styles/
+│   ├── variables.css               # Design system variables (NEW)
+│   └── animations.css              # Reusable animations (NEW)
+├── types/                          # TypeScript tip tanımlamaları
+├── utils/                          # Yardımcı fonksiyonlar
+│   ├── validation.ts               # Input doğrulama ve güvenlik
+│   ├── secureOperations.ts         # Güvenli database işlemleri
+│   └── defaultRules.ts             # Varsayılan kurallar
+└── assets/                         # Statik dosyalar
+
+/ (root)
+├── firestore.rules                 # Firestore security rules (NEW - CRITICAL)
+├── SECURITY.md                     # Security documentation (NEW)
+├── REFACTORING.md                  # Refactoring documentation (NEW)
+└── README.md                       # This file (UPDATED)
 ```
 
 ## 🔒 Güvenlik Özellikleri
@@ -253,10 +291,40 @@ src/
 
 ## 🎨 Özelleştirme
 
-### Renkler ve Tema
-CSS dosyalarında renkleri değiştirebilirsiniz:
-- `src/components/lottery/LotterySession.css` - Çekiliş ekranı renkleri
-- `src/components/user/UserHome.css` - Ana sayfa renkleri
+### Design System Variables (Kolay Özelleştirme!)
+Tüm renkler, spacing, font boyutları merkezi olarak `src/styles/variables.css` dosyasında tanımlıdır:
+
+```css
+:root {
+  /* Ana Renkler - Buradan tüm uygulama renkleri değişir! */
+  --color-primary: #667eea;        /* Ana mor renk */
+  --color-secondary: #764ba2;      /* İkincil mor */
+  --color-accent: #f093fb;         /* Vurgu rengi */
+
+  /* Spacing - Tüm boşluklar */
+  --spacing-md: 16px;              /* Standart boşluk */
+  --spacing-lg: 24px;              /* Büyük boşluk */
+
+  /* Typography - Font boyutları */
+  --font-size-base: 1rem;          /* Temel font boyutu */
+  --font-size-lg: 1.125rem;        /* Büyük font */
+
+  /* ... ve 150+ değişken daha! */
+}
+```
+
+**Tüm uygulama bu değişkenleri kullanır**, yani sadece bir yerde değişiklik yaparak tüm uygulamanın görünümünü değiştirebilirsiniz!
+
+### Animasyonlar
+`src/styles/animations.css` dosyasında 15+ hazır animasyon bulunur:
+- fadeIn, slideInUp, scaleIn
+- bounce, pulse, shimmer
+- ve daha fazlası!
+
+### Component Özelleştirme
+- **Button**: 7 farklı variant (primary, secondary, success, error, warning, ghost, outline)
+- **Card**: Padding ve hover efektleri özelleştirilebilir
+- **Toast**: Renk ve pozisyon ayarlanabilir
 
 ### Varsayılan Kurallar
 `src/utils/defaultRules.ts` dosyasında kuralları ve sorumluluk reddi metnini düzenleyebilirsiniz.

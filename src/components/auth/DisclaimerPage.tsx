@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { DEFAULT_LOTTERY_RULES, DEFAULT_DISCLAIMER_TEXT } from '../../utils/defaultRules';
 import './DisclaimerPage.css';
 
 export function DisclaimerPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { user, acceptTerms } = useAuth();
   const [isOver18, setIsOver18] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -22,18 +18,12 @@ export function DisclaimerPage() {
 
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        termsAccepted: true,
-        termsAcceptedAt: new Date(),
-        isOver18: true
-      });
-
-      navigate('/', { replace: true });
+      await acceptTerms();
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error('Error accepting terms:', error);
       alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!user) {
@@ -43,38 +33,45 @@ export function DisclaimerPage() {
   return (
     <div className="disclaimer-page">
       <div className="disclaimer-container">
-        <div className="disclaimer-header">
-          <h1>Hoş Geldiniz!</h1>
-          <p className="disclaimer-subtitle">
-            Devam etmeden önce lütfen aşağıdaki bilgileri okuyun ve onaylayın.
-          </p>
-        </div>
+        <div className="disclaimer-icon">🎊</div>
+        <h1>Son Bir Adım!</h1>
+        <p className="disclaimer-subtitle">
+          Çekilişe katılmadan önce lütfen aşağıdaki bilgileri okuyun
+        </p>
 
         <div className="disclaimer-content">
-          {/* Kurallar */}
-          <div className="rules-section">
-            <h2>📋 Çekiliş Kuralları</h2>
-            <button
-              className="toggle-rules-btn"
-              onClick={() => setShowRules(!showRules)}
-            >
-              {showRules ? 'Gizle' : 'Kuralları Göster'}
-            </button>
+          {/* Kurallar Bölümü */}
+          <div className="info-card">
+            <div className="card-header" onClick={() => setShowRules(!showRules)}>
+              <div>
+                <span className="card-icon">📋</span>
+                <span className="card-title">Çekiliş Kuralları</span>
+              </div>
+              <span className="toggle-icon">{showRules ? '▲' : '▼'}</span>
+            </div>
 
             {showRules && (
-              <div className="rules-box">
-                {DEFAULT_LOTTERY_RULES.split('\n').map((rule, i) => (
-                  <div key={i} className="rule-item">• {rule}</div>
+              <div className="card-body">
+                {DEFAULT_LOTTERY_RULES.split('\n').filter(r => r.trim()).map((rule, i) => (
+                  <div key={i} className="rule-item">
+                    <span className="bullet">•</span>
+                    <span>{rule}</span>
+                  </div>
                 ))}
               </div>
             )}
           </div>
 
           {/* Sorumluluk Reddi */}
-          <div className="disclaimer-section">
-            <h2>⚠️ Sorumluluk Reddi</h2>
-            <div className="disclaimer-box">
-              {DEFAULT_DISCLAIMER_TEXT.split('\n\n').map((paragraph, i) => (
+          <div className="info-card">
+            <div className="card-header">
+              <div>
+                <span className="card-icon">⚠️</span>
+                <span className="card-title">Sorumluluk Reddi</span>
+              </div>
+            </div>
+            <div className="card-body disclaimer-text">
+              {DEFAULT_DISCLAIMER_TEXT.split('\n\n').filter(p => p.trim()).map((paragraph, i) => (
                 <p key={i}>{paragraph}</p>
               ))}
             </div>
@@ -88,8 +85,8 @@ export function DisclaimerPage() {
                 checked={isOver18}
                 onChange={(e) => setIsOver18(e.target.checked)}
               />
-              <span>
-                18 yaşından büyüğüm ve çekilişe katılmaya yasal olarak yetkiliyim.
+              <span className="checkbox-label">
+                18 yaşından büyüğüm ve çekilişe katılmaya yasal olarak yetkiliyim
               </span>
             </label>
 
@@ -99,22 +96,20 @@ export function DisclaimerPage() {
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
               />
-              <span>
-                Yukarıdaki kuralları ve sorumluluk reddini okudum, anladım ve kabul ediyorum.
+              <span className="checkbox-label">
+                Kuralları ve sorumluluk reddini okudum, anladım ve kabul ediyorum
               </span>
             </label>
           </div>
 
           {/* Submit Button */}
-          <div className="disclaimer-actions">
-            <button
-              className="accept-button"
-              onClick={handleSubmit}
-              disabled={!isOver18 || !acceptedTerms || loading}
-            >
-              {loading ? 'Kaydediliyor...' : 'Kabul Et ve Devam Et'}
-            </button>
-          </div>
+          <button
+            className="accept-button"
+            onClick={handleSubmit}
+            disabled={!isOver18 || !acceptedTerms || loading}
+          >
+            {loading ? 'Kaydediliyor...' : 'Kabul Et ve Başla 🎉'}
+          </button>
         </div>
       </div>
     </div>

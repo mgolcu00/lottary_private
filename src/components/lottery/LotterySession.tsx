@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ticket as TicketType, LotterySettings, LotterySession as LotterySessionType } from '../../types';
 import { Ticket } from '../common/Ticket';
+import { RulesModal } from '../common/RulesModal';
+import { Button } from '../common/Button';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toDateSafe } from '../../utils/date';
+import { usePresenceTracking } from '../../hooks/usePresenceTracking';
 import './LotterySession.css';
 
 export function LotterySession() {
@@ -31,33 +34,12 @@ export function LotterySession() {
   const [amortiSecond, setAmortiSecond] = useState<number | null>(null);
   const [showRulesModal, setShowRulesModal] = useState(false);
 
-  // Presence tracking
-  useEffect(() => {
-    if (!lottery || !user) return;
-
-    const presenceRef = doc(db, 'lotteryPresence', `${lottery.id}_${user.uid}`);
-
-    // Set presence
-    const setPresence = async () => {
-      await setDoc(presenceRef, {
-        userId: user.uid,
-        userName: user.displayName,
-        lotteryId: lottery.id,
-        timestamp: new Date()
-      });
-    };
-
-    setPresence();
-
-    // Update presence every 30 seconds
-    const presenceInterval = setInterval(setPresence, 30000);
-
-    // Remove presence on unmount
-    return () => {
-      clearInterval(presenceInterval);
-      deleteDoc(presenceRef).catch(() => {});
-    };
-  }, [lottery, user]);
+  // Presence tracking - Using custom hook (fixed memory leak)
+  usePresenceTracking({
+    lotteryId: lottery?.id,
+    userId: user?.uid,
+    userName: user?.displayName
+  });
 
   // Count viewers
   useEffect(() => {
@@ -81,7 +63,7 @@ export function LotterySession() {
     return unsubscribe;
   }, [lottery]);
 
-  // Countdown to start
+  // Countdown to start - Fixed: Use stable dependencies to prevent multiple intervals
   useEffect(() => {
     if (!lottery) return;
 
@@ -104,7 +86,7 @@ export function LotterySession() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [lottery]);
+  }, [lottery?.id, lottery?.eventDate]);
 
   useEffect(() => {
     if (!lotteryId) return;
@@ -312,8 +294,6 @@ export function LotterySession() {
 
     // Akıllı algoritma kullan: Mutlaka eşleşen bilet olacak şekilde numara seç
     const candidate = getSmartNumber(drawnNumbers);
-
-    console.log(`Drew number ${candidate} at position ${drawnNumbers.length + 1}. Guaranteed to match at least one ticket.`);
 
     // Valid sayıyı göster
     await updateDoc(doc(db, 'lotterySessions', session.id), {
@@ -539,9 +519,9 @@ export function LotterySession() {
             </div>
           )}
           <p className="admin-note">Admin olarak çekilişi istediğin zaman başlatabilirsin</p>
-          <button onClick={startLottery} className="start-button">
+          <Button variant="primary" size="lg" onClick={startLottery} icon="🎊">
             Çekilişi Şimdi Başlat
-          </button>
+          </Button>
           <div className="pre-stats">
             <div className="pre-stat">
               <span>Toplam Değer</span>
@@ -670,9 +650,9 @@ export function LotterySession() {
           )}
 
           <div className="results-footer">
-            <button className="results-home-button" onClick={() => navigate('/')}>
-              <span>🏠</span> Anasayfaya Dön
-            </button>
+            <Button variant="primary" size="lg" onClick={() => navigate('/')} icon="🏠">
+              Anasayfaya Dön
+            </Button>
           </div>
         </div>
       </div>
@@ -901,47 +881,52 @@ export function LotterySession() {
             <div className="controls-card">
               {stage === 'amorti1' && (
                 <div className="controls-row">
-                  <button className="primary-button wide" onClick={drawAmortiFirst}>
+                  <Button variant="primary" size="lg" fullWidth onClick={drawAmortiFirst} icon="🎲">
                     Amorti #1 (1-5) Çek
-                  </button>
+                  </Button>
                 </div>
               )}
               {stage === 'amorti2' && (
                 <>
                   {amortiSecond === null ? (
                     <div className="controls-row">
-                      <button className="primary-button wide" onClick={drawAmortiSecond}>
+                      <Button variant="primary" size="lg" fullWidth onClick={drawAmortiSecond} icon="🎲">
                         Amorti #2 (5-9) Çek
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <div className="controls-row">
-                      <button className="success-button wide" onClick={transitionToGrandPrize}>
-                        ✨ Büyük Ödüle Geç
-                      </button>
+                      <Button variant="success" size="lg" fullWidth onClick={transitionToGrandPrize} icon="✨">
+                        Büyük Ödüle Geç
+                      </Button>
                     </div>
                   )}
                 </>
               )}
               {stage === 'grand' && (
               <div className="controls-row">
-                <button
-                  className="primary-button wide"
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
                   onClick={drawNumber}
                   disabled={drawnNumbers.length >= 5}
+                  icon="🎲"
                 >
                   {drawnNumbers.length >= 5 ? 'Tüm numaralar çekildi' : 'Numara Çek'}
-                </button>
+                </Button>
               </div>
               )}
               <div className="controls-row">
-                <button
-                  className="secondary-button"
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => finishSession()}
                   disabled={drawnNumbers.length === 0}
+                  icon="🏁"
                 >
                   Çekilişi Sonlandır
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -973,27 +958,11 @@ export function LotterySession() {
       )}
 
       {/* Rules Modal */}
-      {showRulesModal && lottery && (
-        <div className="modal-overlay" onClick={() => setShowRulesModal(false)}>
-          <div className="modal-content rules-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Çekiliş Kuralları</h2>
-              <button className="modal-close" onClick={() => setShowRulesModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              {lottery.rules ? (
-                <div className="rules-content">
-                  {lottery.rules.split('\n').map((line, i) => (
-                    <p key={i}>{line}</p>
-                  ))}
-                </div>
-              ) : (
-                <p className="no-rules">Kurallar henüz tanımlanmamış.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <RulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        rules={lottery?.rules}
+      />
     </div>
   );
 }

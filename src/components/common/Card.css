@@ -1,0 +1,112 @@
+/* Card Base Styles - Christmas Theme */
+.card {
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-base);
+  overflow: hidden;
+}
+
+/* Dark Mode Card */
+[data-theme="dark"] .card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Padding Variants */
+.card-padding-none {
+  padding: 0;
+}
+
+.card-padding-sm {
+  padding: var(--spacing-md);
+}
+
+.card-padding-md {
+  padding: var(--spacing-lg);
+}
+
+.card-padding-lg {
+  padding: var(--spacing-xl);
+}
+
+/* Hover Effect */
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-2xl);
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .card-hover:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  border-color: var(--gold-500);
+}
+
+/* Clickable */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:active {
+  transform: translateY(-2px);
+}
+
+/* Card Header */
+.card-header {
+  padding: var(--spacing-lg);
+  border-bottom: 2px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .card-header {
+  background: var(--night-900);
+  border-bottom-color: var(--night-700);
+}
+
+.card-header h2,
+.card-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-black);
+}
+
+/* Card Body */
+.card-body {
+  padding: var(--spacing-lg);
+  color: var(--color-text-primary);
+}
+
+/* Card Footer */
+.card-footer {
+  padding: var(--spacing-lg);
+  border-top: 2px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .card-footer {
+  background: var(--night-900);
+  border-top-color: var(--night-700);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .card {
+    border-radius: var(--radius-xl);
+  }
+
+  .card-padding-md {
+    padding: var(--spacing-md);
+  }
+
+  .card-padding-lg {
+    padding: var(--spacing-lg);
+  }
+
+  .card-header,
+  .card-body,
+  .card-footer {
+    padding: var(--spacing-md);
+  }
+}

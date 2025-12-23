@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import logoImage from '../../assets/raw_logo.png';
 import './Login.css';
 
 // Snowflakes for Christmas theme
@@ -39,7 +38,35 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signInWithGoogle, sendEmailLink } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'username' | 'email'>('username');
+  const { signInWithGoogle, sendEmailLink, signUpWithUsername, signInWithUsername } = useAuth();
+
+  const handleUsernameAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !password) return;
+
+    setLoading(true);
+    try {
+      // Try to sign in first
+      try {
+        await signInWithUsername(username, password);
+      } catch (signInError) {
+        // If user not found, try to sign up
+        if (signInError instanceof Error && signInError.message === 'Kullanıcı bulunamadı') {
+          await signUpWithUsername(username, password);
+        } else {
+          throw signInError;
+        }
+      }
+    } catch (error: unknown) {
+      console.error('Error with username auth:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Bir hata oluştu';
+      alert(errorMessage);
+      setLoading(false);
+    }
+  };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,9 +99,7 @@ export function Login() {
       <div className="login-container">
         <Snowflakes />
         <div className="login-card">
-          <div className="login-logo-wrapper">
-            <img src={logoImage} alt="Dijital Piyango" className="login-logo" />
-          </div>
+          <div className="lottery-icon">📧</div>
           <h1>Email Gönderildi!</h1>
           <p className="success-message">
             <strong>{email}</strong> adresine giriş linki gönderdik.
@@ -96,12 +121,11 @@ export function Login() {
     <div className="login-container">
       <Snowflakes />
       <div className="login-card">
-        <div className="login-logo-wrapper">
-          <img src={logoImage} alt="Dijital Piyango" className="login-logo" />
-        </div>
+        <div className="lottery-icon">🎄</div>
         <h1>Yılbaşı Çekilişi</h1>
         <p className="subtitle">Giriş yaparak çekilişe katılabilirsiniz</p>
 
+        {/* Google Sign In */}
         <button
           onClick={handleGoogleSignIn}
           disabled={loading}
@@ -116,31 +140,85 @@ export function Login() {
           Google ile Giriş Yap
         </button>
 
-        <div className="divider">
-          <span>veya</span>
-        </div>
+        {/* Email Sign In */}
+        <button
+          onClick={() => setAuthMode('email')}
+          disabled={loading}
+          className="email-method-button"
+        >
+          📧 Email ile Giriş Yap
+        </button>
 
-        <form onSubmit={handleEmailSignIn}>
-          <input
-            type="email"
-            placeholder="Email adresiniz"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="email-input"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="email-button"
-          >
-            Email ile Giriş Yap
-          </button>
-        </form>
+        {/* Email Form (if selected) */}
+        {authMode === 'email' && (
+          <form onSubmit={handleEmailSignIn} style={{ marginTop: '16px' }}>
+            <input
+              type="email"
+              placeholder="Email adresiniz"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="email-input"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="email-button"
+            >
+              {loading ? 'Gönderiliyor...' : 'Giriş Linki Gönder'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('username')}
+              className="back-button"
+              style={{ marginTop: '8px' }}
+            >
+              Geri
+            </button>
+          </form>
+        )}
 
-        <p className="info-text">
-          Email ile giriş yaptığınızda size bir doğrulama linki göndereceğiz.
-        </p>
+        {authMode !== 'email' && (
+          <>
+            <div className="divider">
+              <span>veya</span>
+            </div>
+
+            {/* Username/Password Form */}
+            <form onSubmit={handleUsernameAuth}>
+              <input
+                type="text"
+                placeholder="Kullanıcı adı"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                className="email-input"
+                autoComplete="username"
+              />
+              <input
+                type="password"
+                placeholder="Şifre"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="email-input"
+                autoComplete="current-password"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="email-button"
+              >
+                {loading ? 'Yükleniyor...' : 'Giriş Yap / Kayıt Ol'}
+              </button>
+            </form>
+
+            <p className="info-text">
+              İlk kez kullanıyorsanız otomatik kayıt olacaksınız
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

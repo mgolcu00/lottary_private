@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Users collection - all authenticated users can read (for admin lists), write own data
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Auth users collection for username/password authentication
+    // Users need to read to check if username exists and to verify passwords
+    match /authUsers/{username} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      // Only admins can update or delete auth users
+      allow update, delete: if isAdmin();
+    }
+
+    // Lotteries collection - read for all authenticated users, write for admins only
+    match /lotteries/{lotteryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // CRITICAL FIX: Tickets collection
+    // This rule fixes the "Missing or insufficient permissions" error on ticket purchase
+    match /tickets/{ticketId} {
+      // Anyone authenticated can read tickets
+      allow read: if isAuthenticated();
+
+      // Admins can do anything with tickets
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin();
+
+      // IMPORTANT: Users can update tickets ONLY when:
+      // 1. Current ticket status is 'available'
+      // 2. New status is being set to 'requested'
+      // 3. They are setting userId to their own UID
+      // 4. Ticket numbers, lottery ID, and ticket number are not being changed
+      allow update: if isAuthenticated() &&
+                       !isAdmin() &&
+                       resource.data.status == 'available' &&
+                       request.resource.data.status == 'requested' &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.numbers == resource.data.numbers &&
+                       request.resource.data.lotteryId == resource.data.lotteryId &&
+                       request.resource.data.ticketNumber == resource.data.ticketNumber;
+    }
+
+    // Ticket requests collection - users can create, admins can update/delete
+    match /ticketRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Lottery sessions collection - read for all authenticated, write for admins only
+    match /lotterySessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Lottery presence tracking - users can manage their own presence
+    match /lotteryPresence/{presenceId} {
+      allow read: if isAuthenticated();
+      // Users can create, update, and delete their own presence documents
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+  }
+}

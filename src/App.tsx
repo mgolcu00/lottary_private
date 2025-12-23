@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { Login } from './components/auth/Login';
 import { CompleteSignIn } from './components/auth/CompleteSignIn';
 import { NameSetup } from './components/auth/NameSetup';
@@ -8,19 +9,15 @@ import { UserHome } from './components/user/UserHome';
 import { BuyTicket } from './components/user/BuyTicket';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { LotterySession } from './components/lottery/LotterySession';
+import { LoadingScreen } from './components/common/LoadingScreen';
+import { ThemeToggle } from './components/common/ThemeToggle';
 import './App.css';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-icon">🎊</div>
-        <div className="loader"></div>
-        <div className="loading-text">Yükleniyor...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user) {
@@ -43,13 +40,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-icon">🎊</div>
-        <div className="loader"></div>
-        <div className="loading-text">Yükleniyor...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user) {
@@ -75,13 +66,7 @@ function AppRoutes() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-icon">🎊</div>
-        <div className="loader"></div>
-        <div className="loading-text">Yükleniyor...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
@@ -147,7 +132,10 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <ThemeToggle />
+          <AppRoutes />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );
