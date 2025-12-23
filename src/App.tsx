@@ -8,7 +8,7 @@ import { DisclaimerPage } from './components/auth/DisclaimerPage';
 import { UserHome } from './components/user/UserHome';
 import { BuyTicket } from './components/user/BuyTicket';
 import { AdminPanel } from './components/admin/AdminPanel';
-import { LotterySession } from './components/lottery/LotterySession';
+import { LotterySessionV2 } from './components/lottery/LotterySessionV2';
 import { LoadingScreen } from './components/common/LoadingScreen';
 import { ThemeToggle } from './components/common/ThemeToggle';
 import './App.css';
@@ -112,7 +112,7 @@ function AppRoutes() {
         path="/lottery"
         element={
           <PrivateRoute>
-            <LotterySession />
+            <LotterySessionV2 />
           </PrivateRoute>
         }
       />

@@ -62,6 +62,7 @@ export type LotterySession = {
   winnerTicketIds: string[];
   amortiFirstNumber?: number | null;
   amortiSecondNumber?: number | null;
+  wheelRotation?: number;
   startedAt?: Date;
   completedAt?: Date;
 };

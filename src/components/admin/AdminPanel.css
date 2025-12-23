@@ -1573,3 +1573,30 @@
     width: 100%;
   }
 }
+
+/* Delete Buttons */
+.adminpanel__delete-button,
+.adminpanel__delete-button-small {
+  background: var(--christmas-red-600);
+  color: var(--color-white);
+  border: 2px solid var(--christmas-red-500);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+}
+
+.adminpanel__delete-button-small {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+}
+
+.adminpanel__delete-button:hover,
+.adminpanel__delete-button-small:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  background: var(--christmas-red-500);
+}
