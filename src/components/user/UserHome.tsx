@@ -7,6 +7,9 @@ import { Ticket as TicketType, LotterySettings, LotterySession } from '../../typ
 import { Ticket } from '../common/Ticket';
 import { LotterySelector } from './LotterySelector';
 import { Snowflakes, ChristmasDecorations, ChristmasLights } from '../common/ChristmasEffects';
+import { RulesModal } from '../common/RulesModal';
+import { Card, CardHeader, CardBody } from '../common/Card';
+import { Button } from '../common/Button';
 import { toDateSafe } from '../../utils/date';
 import './UserHome.css';
 
@@ -111,6 +114,7 @@ export function UserHome() {
     return unsubscribe;
   }, [selectedLottery]);
 
+  // Fixed: Use stable dependencies to prevent multiple interval creation
   useEffect(() => {
     if (!selectedLottery) return;
 
@@ -140,7 +144,7 @@ export function UserHome() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [selectedLottery]);
+  }, [selectedLottery?.id, selectedLottery?.eventDate]);
 
   const handleBuyTicket = () => {
     navigate(`/buy-ticket?lotteryId=${selectedLottery?.id}`);
@@ -154,22 +158,23 @@ export function UserHome() {
     return <LotterySelector onSelect={setSelectedLottery} />;
   }
 
-  const soldOut = lotteryStats.available === 0 && lotteryStats.total > 0;
+  // Fixed: Properly check if all tickets are allocated (sold + requested)
+  const soldOut = lotteryStats.available === 0 && lotteryStats.total === selectedLottery.maxTickets;
   const currentValue = lotteryStats.sold * (selectedLottery.ticketPrice || 0);
 
   return (
-    <div className="user-home">
+    <div className="userhome">
       <Snowflakes />
       <ChristmasDecorations />
       <ChristmasLights />
 
-      <div className="user-home-content">
+      <div className="userhome__content">
         {/* Main Card - Lottery Info */}
-        <div className="lottery-main-card">
-          <div className="card-header">
-            <div className="event-info">
-              <h2 className="event-name">{selectedLottery.lotteryName}</h2>
-              <p className="event-date">
+        <Card className="userhome__lottery-card" padding="lg">
+          <CardHeader className="userhome__card-header">
+            <div className="userhome__event-info">
+              <h2 className="userhome__event-name">{selectedLottery.lotteryName}</h2>
+              <p className="userhome__event-date">
                 {new Date(selectedLottery.eventDate).toLocaleString('tr-TR', {
                   day: 'numeric',
                   month: 'long',
@@ -179,131 +184,133 @@ export function UserHome() {
                 })}
               </p>
             </div>
-          </div>
+          </CardHeader>
 
-          {/* Countdown */}
-          <div className="countdown-section">
-            <p className="countdown-label">Çekilişe Kalan Süre</p>
-            <div className="countdown-display">{timeLeft || 'Yükleniyor...'}</div>
-            {!canBuyTickets && timeLeft !== 'Çekiliş başladı!' && (
-              <div className="countdown-warning">
-                ⚠️ Bilet satışı kapandı
-              </div>
-            )}
-          </div>
-
-          {/* Progress Bar */}
-          <div className="sales-progress">
-            <div className="progress-header">
-              <span className="progress-title">Satış Durumu</span>
-              <span className="progress-percent">{lotteryStats.percentSold.toFixed(1)}%</span>
-            </div>
-            <div className="progress-bar-container">
-              <div
-                className="progress-bar-fill"
-                style={{ width: `${Math.min(100, lotteryStats.percentSold)}%` }}
-              />
-            </div>
-            <div className="progress-stats">
-              <div className="stat-item">
-                <span className="stat-label">Satılan</span>
-                <span className="stat-value">{lotteryStats.sold}</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Kalan</span>
-                <span className="stat-value">{lotteryStats.available}</span>
-              </div>
-              {lotteryStats.pending > 0 && (
-                <div className="stat-item">
-                  <span className="stat-label">Bekleyen</span>
-                  <span className="stat-value">{lotteryStats.pending}</span>
+          <CardBody>
+            {/* Countdown */}
+            <div className="userhome__countdown">
+              <p className="userhome__countdown-label">Çekilişe Kalan Süre</p>
+              <div className="userhome__countdown-display">{timeLeft || 'Yükleniyor...'}</div>
+              {!canBuyTickets && timeLeft !== 'Çekiliş başladı!' && (
+                <div className="userhome__countdown-warning">
+                  ⚠️ Bilet satışı kapandı
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="card-actions">
-            {canBuyTickets && !soldOut && (
-              <button className="btn-primary" onClick={handleBuyTicket}>
-                🎫 Bilet Satın Al
-              </button>
-            )}
-            <button className="btn-secondary" onClick={handleGoToLottery}>
-              📺 Canlı Yayını İzle
-            </button>
-            <button className="btn-rules" onClick={() => setShowRulesModal(true)}>
-              📋 Kuralları Gör
-            </button>
-          </div>
-
-          {soldOut && (
-            <div className="sold-out-badge">
-              🔥 Tüm Biletler Satıldı!
+            {/* Progress Bar */}
+            <div className="userhome__progress">
+              <div className="userhome__progress-header">
+                <span className="userhome__progress-title">Satış Durumu</span>
+                <span className="userhome__progress-percent">{lotteryStats.percentSold.toFixed(1)}%</span>
+              </div>
+              <div className="userhome__progress-bar-container">
+                <div
+                  className="userhome__progress-bar-fill"
+                  style={{ width: `${Math.min(100, lotteryStats.percentSold)}%` }}
+                />
+              </div>
+              <div className="userhome__progress-stats">
+                <div className="userhome__stat-item">
+                  <span className="userhome__stat-label">Satılan</span>
+                  <span className="userhome__stat-value">{lotteryStats.sold}</span>
+                </div>
+                <div className="userhome__stat-item">
+                  <span className="userhome__stat-label">Kalan</span>
+                  <span className="userhome__stat-value">{lotteryStats.available}</span>
+                </div>
+                {lotteryStats.pending > 0 && (
+                  <div className="userhome__stat-item">
+                    <span className="userhome__stat-label">Bekleyen</span>
+                    <span className="userhome__stat-value">{lotteryStats.pending}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Action Buttons */}
+            <div className="userhome__actions">
+              {canBuyTickets && !soldOut && (
+                <Button variant="primary" size="lg" fullWidth onClick={handleBuyTicket} icon="🎫">
+                  Bilet Satın Al
+                </Button>
+              )}
+              <Button variant="secondary" size="md" fullWidth onClick={handleGoToLottery} icon="📺">
+                Canlı Yayını İzle
+              </Button>
+              <Button variant="outline" size="md" fullWidth onClick={() => setShowRulesModal(true)} icon="📋">
+                Kuralları Gör
+              </Button>
+            </div>
+
+            {soldOut && (
+              <div className="userhome__sold-out">
+                🔥 Tüm Biletler Satıldı!
+              </div>
+            )}
+          </CardBody>
+        </Card>
 
         {/* Stats Grid */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">💰</div>
-            <div className="stat-content">
-              <p className="stat-label">Toplam Kasa</p>
-              <p className="stat-value">{lotteryStats.totalValue.toLocaleString('tr-TR')} TL</p>
+        <div className="userhome__stats-grid">
+          <Card className="userhome__stat-card" hover padding="md">
+            <div className="userhome__stat-icon">💰</div>
+            <div className="userhome__stat-content">
+              <p className="userhome__stat-label">Toplam Kasa</p>
+              <p className="userhome__stat-value">{lotteryStats.totalValue.toLocaleString('tr-TR')} TL</p>
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <p className="stat-label">Mevcut Değer</p>
-              <p className="stat-value">{currentValue.toLocaleString('tr-TR')} TL</p>
+          </Card>
+          <Card className="userhome__stat-card" hover padding="md">
+            <div className="userhome__stat-icon">📊</div>
+            <div className="userhome__stat-content">
+              <p className="userhome__stat-label">Mevcut Değer</p>
+              <p className="userhome__stat-value">{currentValue.toLocaleString('tr-TR')} TL</p>
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">🎟️</div>
-            <div className="stat-content">
-              <p className="stat-label">Bilet Sayısı</p>
-              <p className="stat-value">{selectedLottery.maxTickets}</p>
+          </Card>
+          <Card className="userhome__stat-card" hover padding="md">
+            <div className="userhome__stat-icon">🎟️</div>
+            <div className="userhome__stat-content">
+              <p className="userhome__stat-label">Bilet Sayısı</p>
+              <p className="userhome__stat-value">{selectedLottery.maxTickets}</p>
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* User Tickets Section */}
-        <div className="my-tickets-section">
-          <div className="section-title-row">
+        <div className="userhome__tickets-section">
+          <div className="userhome__section-title-row">
             <div>
-              <p className="section-eyebrow">Biletlerim</p>
-              <h2 className="section-title">Sahip Olduğun Biletler</h2>
+              <p className="userhome__section-eyebrow">Biletlerim</p>
+              <h2 className="userhome__section-title">Sahip Olduğun Biletler</h2>
             </div>
             {canBuyTickets && !soldOut && userTickets.length > 0 && (
-              <button onClick={handleBuyTicket} className="btn-add">
+              <Button onClick={handleBuyTicket} variant="primary" size="sm">
                 + Bilet Ekle
-              </button>
+              </Button>
             )}
           </div>
 
           {userTicketsLoading ? (
-            <div className="tickets-grid">
+            <div className="userhome__tickets-grid">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="skeleton ticket-skeleton" />
+                <div key={i} className="userhome__skeleton" />
               ))}
             </div>
           ) : userTickets.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🎫</div>
-              <h3 className="empty-title">Henüz Biletiniz Yok</h3>
-              <p className="empty-text">
+            <div className="userhome__empty">
+              <div className="userhome__empty-icon">🎫</div>
+              <h3 className="userhome__empty-title">Henüz Biletiniz Yok</h3>
+              <p className="userhome__empty-text">
                 Çekilişe katılmak için bilet satın alın ve şansınızı deneyin!
               </p>
               {canBuyTickets && !soldOut && (
-                <button onClick={handleBuyTicket} className="btn-primary-large">
+                <Button onClick={handleBuyTicket} variant="primary" size="lg">
                   İlk Biletini Al
-                </button>
+                </Button>
               )}
             </div>
           ) : (
-            <div className="tickets-grid">
+            <div className="userhome__tickets-grid">
               {userTickets.map(ticket => (
                 <Ticket key={ticket.id} ticket={ticket} showStatus={true} />
               ))}
@@ -313,39 +320,23 @@ export function UserHome() {
       </div>
 
       {/* Rules Modal */}
-      {showRulesModal && (
-        <div className="modal-overlay" onClick={() => setShowRulesModal(false)}>
-          <div className="modal-content rules-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Çekiliş Kuralları</h2>
-              <button className="modal-close" onClick={() => setShowRulesModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              {selectedLottery.rules ? (
-                <div className="rules-content">
-                  {selectedLottery.rules.split('\n').map((line, i) => (
-                    <p key={i}>{line}</p>
-                  ))}
-                </div>
-              ) : (
-                <p className="no-rules">Kurallar henüz tanımlanmamış.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <RulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        rules={selectedLottery.rules}
+      />
 
       {/* Live/Results Banner */}
       {lotterySession && lotterySession.status === 'completed' && (
-        <div className="live-banner">
-          <button onClick={handleGoToLottery} className="results-banner-btn">
+        <div className="userhome__live-banner">
+          <button onClick={handleGoToLottery} className="userhome__results-btn">
             🏆 SONUÇLAR AÇIKLANDI - GÖRÜNTÜLE
           </button>
         </div>
       )}
       {lotterySession && lotterySession.status === 'active' && (
-        <div className="live-banner">
-          <button onClick={handleGoToLottery} className="live-banner-btn">
+        <div className="userhome__live-banner">
+          <button onClick={handleGoToLottery} className="userhome__live-btn">
             🔴 CANLI YAYIN - ŞİMDİ İZLE
           </button>
         </div>

@@ -1,6 +1,7 @@
 export type User = {
   uid: string;
   email: string;
+  username?: string;
   displayName: string;
   isAdmin?: boolean;
   termsAccepted?: boolean;

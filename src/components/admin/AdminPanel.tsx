@@ -2,15 +2,20 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { LotterySettings, TicketRequest, Ticket, User } from '../../types';
+import { Card } from '../common/Card';
+import { Button } from '../common/Button';
 import { toDateSafe } from '../../utils/date';
-import { DEFAULT_LOTTERY_RULES, DEFAULT_DISCLAIMER_TEXT } from '../../utils/defaultRules';
+import { DEFAULT_LOTTERY_RULES as _DEFAULT_LOTTERY_RULES } from '../../utils/defaultRules';
+import { CreateLotteryForm } from './CreateLotteryForm';
 import './AdminPanel.css';
 
 type TabType = 'dashboard' | 'requests' | 'users' | 'tickets' | 'settings';
 
 export function AdminPanel() {
   const { user, signOut } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [allLotteries, setAllLotteries] = useState<LotterySettings[]>([]);
   const [lottery, setLottery] = useState<LotterySettings | null>(null);
@@ -18,17 +23,10 @@ export function AdminPanel() {
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [numberRange, setNumberRange] = useState<'1-9' | '1-99'>('1-9');
   const [requestSearch, setRequestSearch] = useState('');
   const [requestStatus, setRequestStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [requestUser, setRequestUser] = useState<'all' | string>('all');
   const [rulesDraft, setRulesDraft] = useState('');
-  const [formData, setFormData] = useState({
-    eventDate: '',
-    ticketPrice: 50,
-    maxTickets: 1000,
-    lotteryName: ''
-  });
 
   // Statistics
   const [stats, setStats] = useState({
@@ -39,7 +37,6 @@ export function AdminPanel() {
     pendingRequests: 0,
     totalRevenue: 0
   });
-  const maxTicketsCap = numberRange === '1-9' ? 59049 : 100000;
 
   // Tüm çekilişleri dinle
   useEffect(() => {
@@ -69,7 +66,6 @@ export function AdminPanel() {
         const next = activeLottery || lotteries[0];
         setLottery(next);
         setRulesDraft(next.rules || '');
-        setNumberRange(next.numberRange ?? '1-9');
       } else if (lotteries.length === 0) {
         setLottery(null);
         setShowCreateForm(true);
@@ -82,7 +78,6 @@ export function AdminPanel() {
   useEffect(() => {
     if (!lottery) return;
     setRulesDraft(lottery.rules || '');
-    setNumberRange(lottery.numberRange ?? '1-9');
 
     const requestsQuery = query(
       collection(db, 'ticketRequests'),
@@ -176,7 +171,7 @@ export function AdminPanel() {
         req.ticketId.toLowerCase().includes(term);
     });
 
-  const generateTickets = async (lotteryId: string, maxTickets: number, rangeMax: number) => {
+  const generateTickets = async (lotteryId: string, maxTickets: number, rangeMax: number, ticketPrice: number) => {
     const tickets: any[] = [];
     const generatedCombinations = new Set<string>();
 
@@ -197,7 +192,7 @@ export function AdminPanel() {
         lotteryId,
         status: 'available',
         numbers,
-        price: formData.ticketPrice
+        price: ticketPrice
       });
     }
 
@@ -209,44 +204,40 @@ export function AdminPanel() {
     await batch.commit();
   };
 
-  const handleCreateLottery = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleCreateLottery = async (data: {
+    eventDate: string;
+    ticketPrice: number;
+    maxTickets: number;
+    lotteryName: string;
+    numberRange: '1-9' | '1-99';
+    rules: string;
+  }) => {
     try {
-      const rangeMax = numberRange === '1-9' ? 9 : 99;
-      const maxCap = numberRange === '1-9' ? 59049 : 100000;
-      const desiredTicketCount = Math.min(formData.maxTickets, maxCap);
+      const rangeMax = data.numberRange === '1-9' ? 9 : 99;
+      const maxCap = data.numberRange === '1-9' ? 59049 : 100000;
+      const desiredTicketCount = Math.min(data.maxTickets, maxCap);
 
       const lotteryRef = await addDoc(collection(db, 'lotteries'), {
-        lotteryName: formData.lotteryName || `Çekiliş ${new Date().toLocaleDateString('tr-TR')}`,
-        eventDate: new Date(formData.eventDate),
-        ticketPrice: formData.ticketPrice,
+        lotteryName: data.lotteryName || `Çekiliş ${new Date().toLocaleDateString('tr-TR')}`,
+        eventDate: new Date(data.eventDate),
+        ticketPrice: data.ticketPrice,
         maxTickets: desiredTicketCount,
         isActive: true,
         salesOpen: true,
-        numberRange,
+        numberRange: data.numberRange,
         status: 'scheduled',
-        rules: DEFAULT_LOTTERY_RULES,
-        disclaimerText: DEFAULT_DISCLAIMER_TEXT,
+        rules: data.rules,
         createdAt: new Date(),
         updatedAt: new Date()
       });
 
-      await generateTickets(lotteryRef.id, desiredTicketCount, rangeMax);
+      await generateTickets(lotteryRef.id, desiredTicketCount, rangeMax, data.ticketPrice);
 
       setShowCreateForm(false);
-      const resetForm = {
-        eventDate: '',
-        ticketPrice: 50,
-        maxTickets: 1000,
-        lotteryName: ''
-      };
-      setFormData(resetForm);
-      setRulesDraft(DEFAULT_LOTTERY_RULES);
-      alert('Çekiliş başarıyla oluşturuldu!');
+      toast.success('Çekiliş başarıyla oluşturuldu!');
     } catch (error) {
       console.error('Error creating lottery:', error);
-      alert('Çekiliş oluşturulamadı. Lütfen tekrar deneyin.');
+      toast.error('Çekiliş oluşturulamadı. Lütfen tekrar deneyin.');
     }
   };
 
@@ -265,7 +256,7 @@ export function AdminPanel() {
 
     } catch (error) {
       console.error('Error approving request:', error);
-      alert('İstek onaylanamadı. Lütfen tekrar deneyin.');
+      toast.error('İstek onaylanamadı. Lütfen tekrar deneyin.');
     }
   };
 
@@ -282,15 +273,16 @@ export function AdminPanel() {
         requestedAt: null
       });
 
-      alert('Bilet isteği reddedildi.');
+      toast.info('Bilet isteği reddedildi.');
     } catch (error) {
       console.error('Error rejecting request:', error);
-      alert('İstek reddedilemedi. Lütfen tekrar deneyin.');
+      toast.error('İstek reddedilemedi. Lütfen tekrar deneyin.');
     }
   };
 
   const handleToggleAdmin = async (targetUser: User) => {
-    if (!confirm(`${targetUser.displayName} kullanıcısını ${targetUser.isAdmin ? 'admin olmaktan çıkar' : 'admin yap'}?`)) {
+    const confirmed = await toast.confirm(`${targetUser.displayName} kullanıcısını ${targetUser.isAdmin ? 'admin olmaktan çıkar' : 'admin yap'}?`);
+    if (!confirmed) {
       return;
     }
 
@@ -298,10 +290,10 @@ export function AdminPanel() {
       await updateDoc(doc(db, 'users', targetUser.uid), {
         isAdmin: !targetUser.isAdmin
       });
-      alert('Kullanıcı yetkisi güncellendi!');
+      toast.success('Kullanıcı yetkisi güncellendi!');
     } catch (error) {
       console.error('Error updating user:', error);
-      alert('Kullanıcı güncellenemedi.');
+      toast.error('Kullanıcı güncellenemedi.');
     }
   };
 
@@ -312,10 +304,10 @@ export function AdminPanel() {
         rules: rulesDraft,
         updatedAt: new Date()
       });
-      alert('Kurallar güncellendi.');
+      toast.success('Kurallar güncellendi.');
     } catch (error) {
       console.error('Error updating rules:', error);
-      alert('Kurallar kaydedilemedi.');
+      toast.error('Kurallar kaydedilemedi.');
     }
   };
 
@@ -328,7 +320,7 @@ export function AdminPanel() {
       });
     } catch (error) {
       console.error('Error toggling sales:', error);
-      alert('Satış durumu güncellenemedi.');
+      toast.error('Satış durumu güncellenemedi.');
     }
   };
 
@@ -341,16 +333,17 @@ export function AdminPanel() {
         isActive: true,
         updatedAt: new Date()
       });
-      alert('Çekiliş tarihi şimdi olarak güncellendi.');
+      toast.success('Çekiliş tarihi şimdi olarak güncellendi.');
     } catch (error) {
       console.error('Error starting now:', error);
-      alert('Çekiliş başlatılamadı.');
+      toast.error('Çekiliş başlatılamadı.');
     }
   };
 
   const endLottery = async () => {
     if (!lottery) return;
-    if (!confirm('Çekilişi sonlandırmak istediğine emin misin?')) return;
+    const confirmed = await toast.confirm('Çekilişi sonlandırmak istediğine emin misin?');
+    if (!confirmed) return;
     try {
       await updateDoc(doc(db, 'lotteries', lottery.id), {
         status: 'completed',
@@ -358,16 +351,17 @@ export function AdminPanel() {
         salesOpen: false,
         updatedAt: new Date()
       });
-      alert('Çekiliş sonlandırıldı.');
+      toast.success('Çekiliş sonlandırıldı.');
     } catch (error) {
       console.error('Error ending lottery:', error);
-      alert('Çekiliş sonlandırılamadı.');
+      toast.error('Çekiliş sonlandırılamadı.');
     }
   };
 
   const deactivateLottery = async () => {
     if (!lottery) return;
-    if (!confirm('Çekilişi pasif hale getirmek istediğine emin misin?')) return;
+    const confirmed = await toast.confirm('Çekilişi pasif hale getirmek istediğine emin misin?');
+    if (!confirmed) return;
     try {
       await updateDoc(doc(db, 'lotteries', lottery.id), {
         isActive: false,
@@ -375,17 +369,17 @@ export function AdminPanel() {
         status: 'cancelled',
         updatedAt: new Date()
       });
-      alert('Çekiliş pasif yapıldı.');
+      toast.success('Çekiliş pasif yapıldı.');
     } catch (error) {
       console.error('Error deactivating lottery:', error);
-      alert('Çekiliş pasif yapılamadı.');
+      toast.error('Çekiliş pasif yapılamadı.');
     }
   };
 
   if (!user?.isAdmin) {
     return (
-      <div className="admin-panel">
-        <div className="no-access">
+      <div className="adminpanel">
+        <div className="adminpanel__no-access">
           <h1>Erişim Reddedildi</h1>
           <p>Bu sayfaya erişim yetkiniz yok.</p>
           <button onClick={signOut} className="logout-button">
@@ -398,86 +392,23 @@ export function AdminPanel() {
 
   if (showCreateForm || !lottery) {
     return (
-      <div className="admin-panel">
-        <div className="create-lottery-form">
-          <h1>Yeni Çekiliş Oluştur</h1>
-          <form onSubmit={handleCreateLottery}>
-            <div className="form-group">
-              <label>Çekiliş Adı</label>
-              <input
-                type="text"
-                value={formData.lotteryName}
-                onChange={(e) => setFormData({ ...formData, lotteryName: e.target.value })}
-                placeholder="Örn: Yılbaşı Çekilişi 2024"
-              />
-              <small className="form-hint">Boş bırakılırsa otomatik isim verilir</small>
-            </div>
-            <div className="form-group">
-              <label>Çekiliş Tarihi ve Saati</label>
-              <input
-                type="datetime-local"
-                value={formData.eventDate}
-                onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Bilet Fiyatı (TL)</label>
-              <input
-                type="number"
-                value={formData.ticketPrice}
-                onChange={(e) => setFormData({ ...formData, ticketPrice: Number(e.target.value) })}
-                min="1"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Numara Aralığı</label>
-              <select
-                value={numberRange}
-                onChange={(e) => {
-                  const nextRange = e.target.value as '1-9' | '1-99';
-                  setNumberRange(nextRange);
-                  const cap = nextRange === '1-9' ? 59049 : 100000;
-                  setFormData(prev => ({ ...prev, maxTickets: Math.min(prev.maxTickets, cap) }));
-                }}
-              >
-                <option value="1-9">Her hane 1-9 (max 59,049 kombinasyon)</option>
-                <option value="1-99">Her hane 1-99 (max 100,000 kombinasyon)</option>
-              </select>
-              <small className="form-hint">Seçtiğin aralık 5 hane için benzersiz kombinasyonları belirler.</small>
-            </div>
-            <div className="form-group">
-              <label>Maksimum Bilet Sayısı</label>
-              <input
-                type="number"
-                value={formData.maxTickets}
-                onChange={(e) => setFormData({ ...formData, maxTickets: Number(e.target.value) })}
-                min="1"
-                max={maxTicketsCap}
-                required
-              />
-              <small className="form-hint">Seçilen aralığa göre max {maxTicketsCap.toLocaleString('tr-TR')} benzersiz bilet.</small>
-            </div>
-            <button type="submit" className="create-button">
-              Çekiliş Oluştur ve Biletleri Oluştur
-            </button>
-          </form>
-        </div>
-      </div>
+      <CreateLotteryForm
+        onSubmit={handleCreateLottery}
+        onCancel={() => setShowCreateForm(false)}
+      />
     );
   }
 
   return (
-    <div className="admin-panel">
-      <header className="admin-header">
-        <div className="header-content">
+    <div className="adminpanel">
+      <Card className="adminpanel__header" padding="lg">
+        <div className="adminpanel__header-content">
           <h1>Admin Paneli</h1>
-          <p className="admin-name">👤 {user.displayName}</p>
+          <p className="adminpanel__admin-name">👤 {user.displayName}</p>
         </div>
-        <div className="header-actions">
+        <div className="adminpanel__header-actions">
           {allLotteries.length > 1 && (
-            <div className="lottery-selector">
+            <div className="adminpanel__lottery-selector">
               <label>Çekiliş:</label>
               <select
                 value={lottery?.id || ''}
@@ -485,7 +416,7 @@ export function AdminPanel() {
                   const selected = allLotteries.find(l => l.id === e.target.value);
                   setLottery(selected || null);
                 }}
-                className="lottery-dropdown"
+                className="adminpanel__lottery-dropdown"
               >
                 {allLotteries.map(l => (
                   <option key={l.id} value={l.id}>
@@ -496,104 +427,114 @@ export function AdminPanel() {
               </select>
             </div>
           )}
-          <button onClick={() => setShowCreateForm(true)} className="create-new-button">
-            + Yeni Çekiliş
-          </button>
-          <button onClick={signOut} className="logout-button">
+          <Button
+            variant="primary"
+            size="md"
+            icon="+"
+            onClick={() => setShowCreateForm(true)}
+          >
+            Yeni Çekiliş
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            icon="🚪"
+            onClick={signOut}
+          >
             Çıkış Yap
-          </button>
+          </Button>
         </div>
-      </header>
+      </Card>
 
-      <div className="admin-tabs">
+      <div className="adminpanel__tabs">
         <button
-          className={`tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+          className={`adminpanel__tab ${activeTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setActiveTab('dashboard')}
         >
           📊 Dashboard
         </button>
         <button
-          className={`tab ${activeTab === 'requests' ? 'active' : ''}`}
+          className={`adminpanel__tab ${activeTab === 'requests' ? 'active' : ''}`}
           onClick={() => setActiveTab('requests')}
         >
           📝 İstekler
           {statusCounts.pending > 0 && (
-            <span className="tab-badge">{statusCounts.pending}</span>
+            <span className="adminpanel__tab-badge">{statusCounts.pending}</span>
           )}
         </button>
         <button
-          className={`tab ${activeTab === 'users' ? 'active' : ''}`}
+          className={`adminpanel__tab ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
           👥 Kullanıcılar
         </button>
         <button
-          className={`tab ${activeTab === 'tickets' ? 'active' : ''}`}
+          className={`adminpanel__tab ${activeTab === 'tickets' ? 'active' : ''}`}
           onClick={() => setActiveTab('tickets')}
         >
           🎫 Biletler
         </button>
         <button
-          className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
+          className={`adminpanel__tab ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
           ⚙️ Ayarlar
         </button>
       </div>
 
-      <div className="admin-content">
+      <div className="adminpanel__content">
         {activeTab === 'dashboard' && (
           <div className="dashboard-tab">
             <h2>İstatistikler</h2>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon">👥</div>
-                <div className="stat-value">{stats.totalUsers}</div>
-                <div className="stat-label">Toplam Kullanıcı</div>
+            <div className="adminpanel__stats-grid">
+              <div className="adminpanel__stat-card">
+                <div className="adminpanel__stat-icon">👥</div>
+                <div className="adminpanel__stat-value">{stats.totalUsers}</div>
+                <div className="adminpanel__stat-label">Toplam Kullanıcı</div>
               </div>
-              <div className="stat-card">
-                <div className="stat-icon">🎫</div>
-                <div className="stat-value">{stats.totalTickets}</div>
-                <div className="stat-label">Toplam Bilet</div>
+              <div className="adminpanel__stat-card">
+                <div className="adminpanel__stat-icon">🎫</div>
+                <div className="adminpanel__stat-value">{stats.totalTickets}</div>
+                <div className="adminpanel__stat-label">Toplam Bilet</div>
               </div>
-              <div className="stat-card success">
-                <div className="stat-icon">✅</div>
-                <div className="stat-value">{stats.soldTickets}</div>
-                <div className="stat-label">Satılan Bilet</div>
+              <div className="adminpanel__stat-card success">
+                <div className="adminpanel__stat-icon">✅</div>
+                <div className="adminpanel__stat-value">{stats.soldTickets}</div>
+                <div className="adminpanel__stat-label">Satılan Bilet</div>
               </div>
-              <div className="stat-card warning">
-                <div className="stat-icon">📋</div>
-                <div className="stat-value">{stats.pendingRequests}</div>
-                <div className="stat-label">Bekleyen İstek</div>
+              <div className="adminpanel__stat-card warning">
+                <div className="adminpanel__stat-icon">📋</div>
+                <div className="adminpanel__stat-value">{stats.pendingRequests}</div>
+                <div className="adminpanel__stat-label">Bekleyen İstek</div>
               </div>
-              <div className="stat-card info">
-                <div className="stat-icon">📦</div>
-                <div className="stat-value">{stats.availableTickets}</div>
-                <div className="stat-label">Müsait Bilet</div>
+              <div className="adminpanel__stat-card info">
+                <div className="adminpanel__stat-icon">📦</div>
+                <div className="adminpanel__stat-value">{stats.availableTickets}</div>
+                <div className="adminpanel__stat-label">Müsait Bilet</div>
               </div>
-              <div className="stat-card revenue">
-                <div className="stat-icon">💰</div>
-                <div className="stat-value">{stats.totalRevenue} TL</div>
-                <div className="stat-label">Toplam Gelir</div>
+              <div className="adminpanel__stat-card revenue">
+                <div className="adminpanel__stat-icon">💰</div>
+                <div className="adminpanel__stat-value">{stats.totalRevenue} TL</div>
+                <div className="adminpanel__stat-label">Toplam Gelir</div>
               </div>
             </div>
 
-            <div className="quick-info">
+            <div className="adminpanel__quick-info">
               <h3>Çekiliş Bilgileri</h3>
-              <div className="info-grid">
-                <div className="info-item">
-                  <span className="info-label">📅 Çekiliş Tarihi:</span>
-                  <span className="info-value">
+              <div className="adminpanel__info-grid">
+                <div className="adminpanel__info-item">
+                  <span className="adminpanel__info-label">📅 Çekiliş Tarihi:</span>
+                  <span className="adminpanel__info-value">
                     {new Date(lottery.eventDate).toLocaleString('tr-TR')}
                   </span>
                 </div>
-                <div className="info-item">
-                  <span className="info-label">💵 Bilet Fiyatı:</span>
-                  <span className="info-value">{lottery.ticketPrice} TL</span>
+                <div className="adminpanel__info-item">
+                  <span className="adminpanel__info-label">💵 Bilet Fiyatı:</span>
+                  <span className="adminpanel__info-value">{lottery.ticketPrice} TL</span>
                 </div>
-                <div className="info-item">
-                  <span className="info-label">📊 Doluluk Oranı:</span>
-                  <span className="info-value">
+                <div className="adminpanel__info-item">
+                  <span className="adminpanel__info-label">📊 Doluluk Oranı:</span>
+                  <span className="adminpanel__info-value">
                     %{((stats.soldTickets / stats.totalTickets) * 100).toFixed(1)}
                   </span>
                 </div>
@@ -605,8 +546,8 @@ export function AdminPanel() {
         {activeTab === 'requests' && (
           <div className="requests-tab">
             <h2>Bilet İstekleri</h2>
-            <div className="requests-toolbar">
-              <div className="search-input">
+            <div className="adminpanel__requests-toolbar">
+              <div className="adminpanel__search-input">
                 <input
                   type="text"
                   placeholder="İsim, e-posta, bilet no veya istek ID ile ara"
@@ -614,34 +555,34 @@ export function AdminPanel() {
                   onChange={(e) => setRequestSearch(e.target.value)}
                 />
               </div>
-              <div className="request-filters">
-                <div className="status-filters">
+              <div className="adminpanel__request-filters">
+                <div className="adminpanel__status-filters">
                   <button
-                    className={`status-filter ${requestStatus === 'pending' ? 'active' : ''}`}
+                    className={`adminpanel__status-filter ${requestStatus === 'pending' ? 'active' : ''}`}
                     onClick={() => setRequestStatus('pending')}
                   >
                     Bekleyen ({statusCounts.pending})
                   </button>
                   <button
-                    className={`status-filter ${requestStatus === 'approved' ? 'active' : ''}`}
+                    className={`adminpanel__status-filter ${requestStatus === 'approved' ? 'active' : ''}`}
                     onClick={() => setRequestStatus('approved')}
                   >
                     Onaylanan ({statusCounts.approved})
                   </button>
                   <button
-                    className={`status-filter ${requestStatus === 'rejected' ? 'active' : ''}`}
+                    className={`adminpanel__status-filter ${requestStatus === 'rejected' ? 'active' : ''}`}
                     onClick={() => setRequestStatus('rejected')}
                   >
                     Reddedilen ({statusCounts.rejected})
                   </button>
                   <button
-                    className={`status-filter ${requestStatus === 'all' ? 'active' : ''}`}
+                    className={`adminpanel__status-filter ${requestStatus === 'all' ? 'active' : ''}`}
                     onClick={() => setRequestStatus('all')}
                   >
                     Tümü ({statusCounts.all})
                   </button>
                 </div>
-                <div className="user-filter">
+                <div className="adminpanel__user-filter">
                   <label>Kullanıcı:</label>
                   <select
                     value={requestUser}
@@ -659,8 +600,8 @@ export function AdminPanel() {
             </div>
 
             {filteredRequests.length === 0 ? (
-              <div className="no-data">
-                <div className="empty-icon">{ticketRequests.length === 0 ? '📭' : '🔍'}</div>
+              <div className="adminpanel__no-data">
+                <div className="adminpanel__empty-icon">{ticketRequests.length === 0 ? '📭' : '🔍'}</div>
                 <p>
                   {ticketRequests.length === 0
                     ? 'Bekleyen istek yok'
@@ -668,54 +609,54 @@ export function AdminPanel() {
                 </p>
               </div>
             ) : (
-              <div className="requests-list">
+              <div className="adminpanel__requests-list">
                 {filteredRequests.map(request => (
-                  <div key={request.id} className="request-card">
-                    <div className="request-header">
-                      <div className="user-info">
-                        <span className="user-avatar">👤</span>
+                  <div key={request.id} className="adminpanel__request-card">
+                    <div className="adminpanel__request-header">
+                      <div className="adminpanel__user-info">
+                        <span className="adminpanel__user-avatar">👤</span>
                         <div>
-                          <div className="user-name">{request.userName}</div>
-                          <div className="user-email">{request.userEmail}</div>
+                          <div className="adminpanel__user-name">{request.userName}</div>
+                          <div className="adminpanel__user-email">{request.userEmail}</div>
                         </div>
                       </div>
-                      <div className="request-badges">
-                        <div className="ticket-badge">
+                      <div className="adminpanel__request-badges">
+                        <div className="adminpanel__ticket-badge">
                           🎫 #{request.ticketNumber.toString().padStart(3, '0')}
                         </div>
-                        <span className={`status-chip ${request.status}`}>
+                        <span className={`adminpanel__status-chip ${request.status}`}>
                           {request.status === 'pending' && 'Beklemede'}
                           {request.status === 'approved' && 'Onaylandı'}
                           {request.status === 'rejected' && 'Reddedildi'}
                         </span>
                       </div>
                     </div>
-                    <div className="request-meta">
-                      <span className="request-time">
+                    <div className="adminpanel__request-meta">
+                      <span className="adminpanel__request-time">
                         🕐 {new Date(request.createdAt).toLocaleString('tr-TR')}
                       </span>
-                      <span className="request-amount">
+                      <span className="adminpanel__request-amount">
                         💰 {lottery.ticketPrice} TL
                       </span>
                     </div>
                     {request.status === 'pending' ? (
-                      <div className="request-actions">
+                      <div className="adminpanel__request-actions">
                         <button
                           onClick={() => handleApproveRequest(request)}
-                          className="approve-button"
+                          className="adminpanel__approve-button"
                         >
                           ✓ Onayla
                         </button>
                         <button
                           onClick={() => handleRejectRequest(request)}
-                          className="reject-button"
+                          className="adminpanel__reject-button"
                         >
                           ✕ Reddet
                         </button>
                       </div>
                     ) : (
-                      <div className="request-actions inactive">
-                        <div className="decision-note">
+                      <div className="adminpanel__request-actions inactive">
+                        <div className="adminpanel__decision-note">
                           {request.status === 'approved' ? '✅ Bu istek onaylandı' : '🚫 Bu istek reddedildi'}
                         </div>
                       </div>
@@ -730,24 +671,24 @@ export function AdminPanel() {
         {activeTab === 'users' && (
           <div className="users-tab">
             <h2>Kullanıcılar ({allUsers.length})</h2>
-            <div className="users-list">
+            <div className="adminpanel__users-list">
               {allUsers.map(u => (
-                <div key={u.uid} className="user-card">
-                  <div className="user-avatar-large">👤</div>
-                  <div className="user-details">
-                    <div className="user-name-large">{u.displayName || 'İsimsiz'}</div>
-                    <div className="user-email-small">{u.email}</div>
-                    {u.isAdmin && <span className="admin-badge">Admin</span>}
+                <div key={u.uid} className="adminpanel__user-card">
+                  <div className="adminpanel__user-avatar-large">👤</div>
+                  <div className="adminpanel__user-details">
+                    <div className="adminpanel__user-name-large">{u.displayName || 'İsimsiz'}</div>
+                    <div className="adminpanel__user-email-small">{u.email}</div>
+                    {u.isAdmin && <span className="adminpanel__admin-badge">Admin</span>}
                   </div>
-                  <div className="user-stats">
-                    <span className="user-stat">
+                  <div className="adminpanel__user-stats">
+                    <span className="adminpanel__user-stat">
                       🎫 {allTickets.filter(t => t.userId === u.uid && t.status === 'confirmed').length}
                     </span>
                   </div>
                   {user.uid !== u.uid && (
                     <button
                       onClick={() => handleToggleAdmin(u)}
-                      className={`toggle-admin-button ${u.isAdmin ? 'remove' : 'add'}`}
+                      className={`adminpanel__toggle-admin-button ${u.isAdmin ? 'remove' : 'add'}`}
                     >
                       {u.isAdmin ? '❌ Admin Kaldır' : '⭐ Admin Yap'}
                     </button>
@@ -761,19 +702,19 @@ export function AdminPanel() {
         {activeTab === 'tickets' && (
           <div className="tickets-tab">
             <h2>Tüm Biletler</h2>
-            <div className="tickets-filter">
-              <button className="filter-btn all">Tümü ({allTickets.length})</button>
-              <button className="filter-btn available">
+            <div className="adminpanel__tickets-filter">
+              <button className="adminpanel__filter-btn all">Tümü ({allTickets.length})</button>
+              <button className="adminpanel__filter-btn available">
                 Müsait ({allTickets.filter(t => t.status === 'available').length})
               </button>
-              <button className="filter-btn requested">
+              <button className="adminpanel__filter-btn requested">
                 Talep ({allTickets.filter(t => t.status === 'requested').length})
               </button>
-              <button className="filter-btn confirmed">
+              <button className="adminpanel__filter-btn confirmed">
                 Satıldı ({allTickets.filter(t => t.status === 'confirmed').length})
               </button>
             </div>
-            <div className="tickets-table">
+            <div className="adminpanel__tickets-table">
               <table>
                 <thead>
                   <tr>
@@ -786,14 +727,14 @@ export function AdminPanel() {
                 <tbody>
                   {allTickets.slice(0, 50).map(ticket => (
                     <tr key={ticket.id}>
-                      <td className="ticket-no">#{ticket.ticketNumber.toString().padStart(3, '0')}</td>
-                      <td className="ticket-numbers">
+                      <td className="adminpanel__ticket-no">#{ticket.ticketNumber.toString().padStart(3, '0')}</td>
+                      <td className="adminpanel__ticket-numbers">
                         {ticket.numbers.map((num, i) => (
-                          <span key={i} className="number-pill">{num}</span>
+                          <span key={i} className="adminpanel__number-pill">{num}</span>
                         ))}
                       </td>
                       <td>
-                        <span className={`status-badge ${ticket.status}`}>
+                        <span className={`adminpanel__status-badge ${ticket.status}`}>
                           {ticket.status === 'available' && '📦 Müsait'}
                           {ticket.status === 'requested' && '⏳ Talep'}
                           {ticket.status === 'confirmed' && '✅ Satıldı'}
@@ -806,7 +747,7 @@ export function AdminPanel() {
                 </tbody>
               </table>
               {allTickets.length > 50 && (
-                <p className="table-note">İlk 50 bilet gösteriliyor</p>
+                <p className="adminpanel__table-note">İlk 50 bilet gösteriliyor</p>
               )}
             </div>
           </div>
@@ -815,77 +756,77 @@ export function AdminPanel() {
         {activeTab === 'settings' && (
           <div className="settings-tab">
             <h2>Çekiliş Ayarları</h2>
-            <div className="settings-card controls">
-              <div className="setting-actions">
-                <button className={`chip-button ${lottery.salesOpen ?? true ? 'active' : ''}`} onClick={toggleSales}>
+            <div className="adminpanel__settings-card controls">
+              <div className="adminpanel__setting-actions">
+                <button className={`adminpanel__chip-button ${lottery.salesOpen ?? true ? 'active' : ''}`} onClick={toggleSales}>
                   {(lottery.salesOpen ?? true) ? 'Satışı Kapat' : 'Satışı Aç'}
                 </button>
-                <button className="chip-button" onClick={startNow}>
+                <button className="adminpanel__chip-button" onClick={startNow}>
                   Çekilişi Şimdi Başlat
                 </button>
-                <button className="chip-button" onClick={endLottery}>
+                <button className="adminpanel__chip-button" onClick={endLottery}>
                   Çekilişi Sonlandır
                 </button>
-                <button className="chip-button danger" onClick={deactivateLottery}>
+                <button className="adminpanel__chip-button danger" onClick={deactivateLottery}>
                   Çekilişi Pasif Yap
                 </button>
               </div>
             </div>
-            <div className="settings-card">
-              <div className="setting-item">
-                <span className="setting-label">Çekiliş ID:</span>
-                <span className="setting-value">{lottery.id}</span>
+            <div className="adminpanel__settings-card">
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Çekiliş ID:</span>
+                <span className="adminpanel__setting-value">{lottery.id}</span>
               </div>
-              <div className="setting-item">
-                <span className="setting-label">Çekiliş Tarihi:</span>
-                <span className="setting-value">
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Çekiliş Tarihi:</span>
+                <span className="adminpanel__setting-value">
                   {new Date(lottery.eventDate).toLocaleString('tr-TR')}
                 </span>
               </div>
-              <div className="setting-item">
-                <span className="setting-label">Bilet Fiyatı:</span>
-                <span className="setting-value">{lottery.ticketPrice} TL</span>
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Bilet Fiyatı:</span>
+                <span className="adminpanel__setting-value">{lottery.ticketPrice} TL</span>
               </div>
-              <div className="setting-item">
-                <span className="setting-label">Numara Aralığı:</span>
-                <span className="setting-value">{lottery.numberRange === '1-99' ? 'Her hane 1-99' : 'Her hane 1-9'}</span>
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Numara Aralığı:</span>
+                <span className="adminpanel__setting-value">{lottery.numberRange === '1-99' ? 'Her hane 1-99' : 'Her hane 1-9'}</span>
               </div>
-              <div className="setting-item">
-                <span className="setting-label">Maksimum Bilet:</span>
-                <span className="setting-value">{lottery.maxTickets} adet</span>
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Maksimum Bilet:</span>
+                <span className="adminpanel__setting-value">{lottery.maxTickets} adet</span>
               </div>
-              <div className="setting-item">
-                <span className="setting-label">Durum:</span>
-                <span className="setting-value">
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Durum:</span>
+                <span className="adminpanel__setting-value">
                   {lottery.isActive ? '✅ Aktif' : '❌ Pasif'}
                 </span>
               </div>
-              <div className="setting-item">
-                <span className="setting-label">Oluşturulma:</span>
-                <span className="setting-value">
+              <div className="adminpanel__setting-item">
+                <span className="adminpanel__setting-label">Oluşturulma:</span>
+                <span className="adminpanel__setting-value">
                   {new Date(lottery.createdAt).toLocaleString('tr-TR')}
                 </span>
               </div>
             </div>
-            <div className="settings-card">
-              <div className="settings-card-header">
+            <div className="adminpanel__settings-card">
+              <div className="adminpanel__settings-card-header">
                 <div>
                   <h3>Kurallar</h3>
-                  <p className="settings-description">Bu alan kullanıcıların göreceği şekilde yayınlanır.</p>
+                  <p className="adminpanel__settings-description">Bu alan kullanıcıların göreceği şekilde yayınlanır.</p>
                 </div>
-                <button className="save-button" onClick={handleSaveRules}>Kaydet</button>
+                <button className="adminpanel__save-button" onClick={handleSaveRules}>Kaydet</button>
               </div>
               <textarea
-                className="rules-textarea"
+                className="adminpanel__rules-textarea"
                 value={rulesDraft}
                 onChange={(e) => setRulesDraft(e.target.value)}
                 placeholder="Örn: Çekiliş 5 haneli sayılarla oynanır, her bilet benzersizdir..."
               />
             </div>
-            <div className="danger-zone">
+            <div className="adminpanel__danger-zone">
               <h3>⚠️ Tehlikeli Bölge</h3>
               <p>Çekilişi pasif hale getirmek veya silmek için dikkatli olun.</p>
-              <button className="danger-button" disabled>
+              <button className="adminpanel__danger-button" disabled>
                 Çekilişi Kapat (Yakında)
               </button>
             </div>

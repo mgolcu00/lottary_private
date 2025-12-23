@@ -3,8 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, query, where, onSnapshot, addDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { Ticket as TicketType, LotterySettings } from '../../types';
 import { Ticket } from '../common/Ticket';
+import { Card } from '../common/Card';
+import { Button } from '../common/Button';
 import { Snowflakes, ChristmasDecorations } from '../common/ChristmasEffects';
 import { toDateSafe } from '../../utils/date';
 import { ticketRequestLimiter, ValidationError } from '../../utils/validation';
@@ -13,6 +16,7 @@ import './BuyTicket.css';
 
 export function BuyTicket() {
   const { user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const lotteryId = searchParams.get('lotteryId');
@@ -22,6 +26,8 @@ export function BuyTicket() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'number' | 'random'>('number');
 
   useEffect(() => {
     if (!lotteryId) {
@@ -74,7 +80,7 @@ export function BuyTicket() {
 
   const handleTicketSelect = (ticket: TicketType) => {
     if (lottery && lottery.salesOpen === false) {
-      alert('Satışlar kapalı.');
+      toast.warning('Satışlar kapalı.');
       return;
     }
     setSelectedTicket(ticket);
@@ -86,13 +92,13 @@ export function BuyTicket() {
 
     // Rate limiting check
     if (!ticketRequestLimiter.isAllowed(user.uid)) {
-      alert('Çok fazla istek gönderdiniz. Lütfen bir dakika bekleyin.');
+      toast.warning('Çok fazla istek gönderdiniz. Lütfen bir dakika bekleyin.');
       return;
     }
 
     // Validate lottery state
     if (lottery.salesOpen === false) {
-      alert('Satışlar kapalı.');
+      toast.warning('Satışlar kapalı.');
       return;
     }
 
@@ -108,7 +114,7 @@ export function BuyTicket() {
       );
 
       if (!result.success) {
-        alert(result.error || 'Bilet satın alınamadı');
+        toast.error(result.error || 'Bilet satın alınamadı');
         setLoading(false);
         return;
       }
@@ -125,57 +131,139 @@ export function BuyTicket() {
         lotteryId: lottery.id
       });
 
+      setLoading(false);
       setShowRequestModal(false);
       setShowSuccessModal(true);
+      toast.success('Bilet isteğiniz başarıyla gönderildi!');
     } catch (error) {
       console.error('Error requesting ticket:', error);
 
       if (error instanceof ValidationError) {
-        alert(error.message);
+        toast.error(error.message);
       } else {
-        alert('Bilet isteği gönderilemedi. Lütfen tekrar deneyin.');
+        toast.error('Bilet isteği gönderilemedi. Lütfen tekrar deneyin.');
       }
+      setLoading(false);
     }
-    setLoading(false);
   };
+
+  const handleLuckyPick = () => {
+    if (filteredTickets.length === 0) return;
+    const randomTicket = filteredTickets[Math.floor(Math.random() * filteredTickets.length)];
+    handleTicketSelect(randomTicket);
+  };
+
+  // Filter and sort tickets
+  const filteredTickets = availableTickets
+    .filter(ticket => {
+      if (!searchQuery) return true;
+      return ticket.ticketNumber.toString().includes(searchQuery);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'random') {
+        return Math.random() - 0.5;
+      }
+      return a.ticketNumber - b.ticketNumber;
+    });
 
   if (!lottery) {
     return null;
   }
 
   return (
-    <div className="buy-ticket-page">
+    <div className="buyticket">
       <Snowflakes />
       <ChristmasDecorations />
 
-      <div className="buy-ticket-container">
-        <div className="buy-ticket-header">
-          <h1>Bilet Seç</h1>
-          <div className="price-tag">
-            💰 {lottery.ticketPrice} TL
+      <div className="buyticket__container">
+        <Card className="buyticket__header" padding="lg">
+          <div className="buyticket__header-content">
+            <div className="buyticket__header-left">
+              <Button variant="ghost" size="sm" icon="←" onClick={() => navigate('/')}>
+                Geri
+              </Button>
+              <h1>Bilet Seç</h1>
+            </div>
+            <div className="buyticket__price-tag">
+              💰 {lottery.ticketPrice} TL
+            </div>
           </div>
-        </div>
+        </Card>
 
         {lottery.salesOpen === false && (
-          <div className="sales-closed-banner">
+          <div className="buyticket__sales-closed-banner">
             ⚠️ Satışlar kapalı. Admin tekrar açana kadar bilet seçemezsin.
           </div>
         )}
 
-        <div className="available-tickets-section">
-          <h2>
-            Müsait Biletler
-            <span className="ticket-count">({availableTickets.length} adet)</span>
-          </h2>
+        <Card className="buyticket__tickets-section" padding="lg">
+          <div className="buyticket__section-header">
+            <h2>
+              Müsait Biletler
+              <span className="buyticket__ticket-count">({filteredTickets.length}/{availableTickets.length})</span>
+            </h2>
+            {availableTickets.length > 0 && (
+              <Button
+                variant="primary"
+                size="md"
+                icon="🍀"
+                onClick={handleLuckyPick}
+                disabled={filteredTickets.length === 0}
+              >
+                Şanslı Seçim
+              </Button>
+            )}
+          </div>
+
+          {availableTickets.length > 0 && (
+            <div className="buyticket__filters">
+              <div className="buyticket__search-box">
+                <input
+                  type="text"
+                  placeholder="Bilet numarası ara..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="buyticket__search-input"
+                />
+                {searchQuery && (
+                  <button className="buyticket__clear-search" onClick={() => setSearchQuery('')}>
+                    ✕
+                  </button>
+                )}
+              </div>
+              <div className="buyticket__sort-buttons">
+                <button
+                  className={`buyticket__sort-button ${sortBy === 'number' ? 'active' : ''}`}
+                  onClick={() => setSortBy('number')}
+                >
+                  📊 Sıralı
+                </button>
+                <button
+                  className={`buyticket__sort-button ${sortBy === 'random' ? 'active' : ''}`}
+                  onClick={() => setSortBy('random')}
+                >
+                  🎲 Rastgele
+                </button>
+              </div>
+            </div>
+          )}
 
           {availableTickets.length === 0 ? (
-            <div className="no-tickets">
-              <div className="empty-icon">😔</div>
+            <div className="buyticket__empty">
+              <div className="buyticket__empty-icon">😔</div>
               <p>Müsait bilet kalmadı</p>
             </div>
+          ) : filteredTickets.length === 0 ? (
+            <div className="buyticket__empty">
+              <div className="buyticket__empty-icon">🔍</div>
+              <p>Aradığınız bilet bulunamadı</p>
+              <Button variant="outline" size="sm" onClick={() => setSearchQuery('')}>
+                Aramayı Temizle
+              </Button>
+            </div>
           ) : (
-            <div className="tickets-grid">
-              {availableTickets.map(ticket => (
+            <div className="buyticket__tickets-grid">
+              {filteredTickets.map(ticket => (
                 <Ticket
                   key={ticket.id}
                   ticket={ticket}
@@ -185,86 +273,97 @@ export function BuyTicket() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
       {showRequestModal && selectedTicket && (
-        <div className="modal-overlay" onClick={() => !loading && setShowRequestModal(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Satın al</h3>
-              <button
-                className="modal-close"
-                onClick={() => setShowRequestModal(false)}
-                aria-label="Kapat"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="modal-subtitle">
-              #{selectedTicket.ticketNumber.toString().padStart(6, '0')} numaralı bileti satın almak istiyor musun?
-            </p>
-            <div className="modal-ticket-preview">
-              <Ticket ticket={selectedTicket} showStatus={false} />
-            </div>
-            <div className="modal-actions">
-              <button
-                className="secondary-button"
-                onClick={() => setShowRequestModal(false)}
-                disabled={loading}
-              >
-                Vazgeç
-              </button>
-              <button
-                className="primary-button"
-                onClick={handleRequestTicket}
-                disabled={loading}
-              >
-                {loading ? 'Gönderiliyor...' : `${lottery.ticketPrice} TL - Satın al`}
-              </button>
-            </div>
+        <div className="buyticket__modal-overlay" onClick={() => !loading && setShowRequestModal(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Card className="buyticket__modal-card" padding="lg">
+              <div className="buyticket__modal-header">
+                <h3>Satın al</h3>
+                <button
+                  className="buyticket__modal-close"
+                  onClick={() => !loading && setShowRequestModal(false)}
+                  disabled={loading}
+                  aria-label="Kapat"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="buyticket__modal-subtitle">
+                #{selectedTicket.ticketNumber.toString().padStart(6, '0')} numaralı bileti satın almak istiyor musun?
+              </p>
+              <div className="buyticket__modal-ticket-preview">
+                <Ticket ticket={selectedTicket} showStatus={false} />
+              </div>
+              <div className="buyticket__modal-actions">
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => setShowRequestModal(false)}
+                  disabled={loading}
+                >
+                  Vazgeç
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleRequestTicket}
+                  loading={loading}
+                  icon="💳"
+                >
+                  {lottery.ticketPrice} TL - Satın al
+                </Button>
+              </div>
+            </Card>
           </div>
         </div>
       )}
 
       {showSuccessModal && (
-        <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
-          <div className="modal-card success" onClick={(e) => e.stopPropagation()}>
-            <div className="success-icon">✅</div>
-            <h3>İstek Gönderildi!</h3>
-            <p className="confirmation-message">
-              Ödemenizi tamamlayıp admin onayını bekleyin. Onay sonrası biletiniz aktif olacak.
-            </p>
-            <div className="instructions">
-              <div className="instruction-item">
-                <span className="step-number">1</span>
-                <p><strong>{lottery.ticketPrice} TL</strong> ödeyin</p>
+        <div className="buyticket__modal-overlay" onClick={() => setShowSuccessModal(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Card className="buyticket__modal-card success" padding="lg">
+              <div className="buyticket__success-icon">✅</div>
+              <h3>İstek Gönderildi!</h3>
+              <p className="buyticket__confirmation-message">
+                Ödemenizi tamamlayıp admin onayını bekleyin. Onay sonrası biletiniz aktif olacak.
+              </p>
+              <div className="buyticket__instructions">
+                <div className="buyticket__instruction-item">
+                  <span className="buyticket__step-number">1</span>
+                  <p><strong>{lottery.ticketPrice} TL</strong> ödeyin</p>
+                </div>
+                <div className="buyticket__instruction-item">
+                  <span className="buyticket__step-number">2</span>
+                  <p>Onayı bekleyin</p>
+                </div>
               </div>
-              <div className="instruction-item">
-                <span className="step-number">2</span>
-                <p>Onayı bekleyin</p>
+              <div className="buyticket__warning-box">
+                ⚠️ Çekiliş tarihine 1 saat kala onaylanmayan biletler iptal edilir.
               </div>
-            </div>
-            <div className="warning-box">
-              ⚠️ Çekiliş tarihine 1 saat kala onaylanmayan biletler iptal edilir.
-            </div>
-            <div className="modal-actions">
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setShowSuccessModal(false);
-                  setSelectedTicket(null);
-                }}
-              >
-                Devam et
-              </button>
-              <button
-                className="primary-button"
-                onClick={() => navigate('/')}
-              >
-                Çekilişe dön
-              </button>
-            </div>
+              <div className="buyticket__modal-actions">
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setSelectedTicket(null);
+                  }}
+                >
+                  Devam et
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon="🏠"
+                  onClick={() => navigate('/')}
+                >
+                  Çekilişe dön
+                </Button>
+              </div>
+            </Card>
           </div>
         </div>
       )}
